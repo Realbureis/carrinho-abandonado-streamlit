@@ -13,8 +13,8 @@ st.markdown("Filtra pedidos salvos de novos clientes e gera o link de contato co
 COL_ID = 'Codigo Cliente'
 COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
-COL_FILTER = 'Quant. Pedidos Enviados' # Para filtrar se o cliente é novo (valor == 0)
-COL_STATUS = 'Status' # Para filtrar se o pedido está 'Pedido salvo'
+COL_FILTER = 'Quant. Pedidos Enviados' 
+COL_STATUS = 'Status' 
 # Colunas de SAÍDA
 COL_OUT_NAME = 'Cliente_Formatado'
 COL_OUT_MSG = 'Mensagem_Personalizada'
@@ -40,7 +40,7 @@ def process_data(df_input):
         'removed_filter': 0
     }
 
-    # 2. Eliminar Duplicatas (Coluna Codigo Cliente)
+    # 2. Eliminar Duplicatas (Codigo Cliente)
     df_unique = df.drop_duplicates(subset=[COL_ID], keep='first')
     metrics['removed_duplicates'] = len(df) - len(df_unique)
     df = df_unique
@@ -50,7 +50,7 @@ def process_data(df_input):
     
     df_qualified = df[
         (df[COL_STATUS] == 'Pedido salvo') & 
-        (df[COL_FILTER] == 0) # Apenas clientes que nunca compraram
+        (df[COL_FILTER] == 0)
     ]
         
     metrics['removed_filter'] = len(df) - len(df_qualified)
@@ -63,7 +63,6 @@ def process_data(df_input):
         if pd.isna(full_name) or full_name == '':
             first_name = "Cliente"
         else:
-            # Garante que o nome é uma string antes de processar
             first_name = str(full_name).strip().split(' ')[0] 
             first_name = first_name.capitalize() 
             
@@ -79,26 +78,19 @@ def process_data(df_input):
         
         return first_name, message
 
-    # --- CORREÇÃO DO ERRO VALUEERROR ---
+    # --- CORREÇÃO FINAL DO ERRO VALUEERROR/TYPEERROR ---
     
-    # 4a. Garante que a coluna de nome não tem valores nulos para evitar falha no apply/split
+    # 4a. Garante que a coluna de nome não tem valores nulos
     df[COL_NAME] = df[COL_NAME].fillna('')
     
-    # Cria uma coluna temporária com as tuplas (Nome Formatado, Mensagem)
-    df['temp_data'] = df.apply(
-        lambda row: format_name_and_create_message(row[COL_NAME]), 
-        axis=1
-    )
-    
-    # Usa o método .str.split com apply(pd.Series) para desempacotar de forma segura.
-    # O .tolist() era a fonte do erro, o .apply(pd.Series) é mais robusto.
-    temp_df = df['temp_data'].apply(pd.Series)
-    
-    # Renomeia e atribui as colunas temporárias
-    df[[COL_OUT_NAME, COL_OUT_MSG]] = temp_df.rename(columns={0: COL_OUT_NAME, 1: COL_OUT_MSG})
+    # Cria uma nova coluna aplicando a função, resultando em uma Series de tuplas
+    data_series = df[COL_NAME].apply(format_name_and_create_message)
 
-    # Remove a coluna temporária
-    df = df.drop(columns=['temp_data'])
+    # Converte a Series de tuplas em um DataFrame com o índice correto
+    temp_df = pd.DataFrame(data_series.tolist(), index=df.index)
+    
+    # Atribui as colunas renomeadas de volta ao DataFrame principal
+    df[[COL_OUT_NAME, COL_OUT_MSG]] = temp_df.rename(columns={0: COL_OUT_NAME, 1: COL_OUT_MSG})
     # -----------------------------------
     
     return df, metrics
