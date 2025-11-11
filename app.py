@@ -63,7 +63,8 @@ def process_data(df_input):
         if pd.isna(full_name) or full_name == '':
             first_name = "Cliente"
         else:
-            first_name = str(full_name).strip().split(' ')[0]
+            # Garante que o nome é uma string antes de processar
+            first_name = str(full_name).strip().split(' ')[0] 
             first_name = first_name.capitalize() 
             
         # --- TEMPLATE DA MENSAGEM DE VENDAS ---
@@ -76,19 +77,26 @@ def process_data(df_input):
         )
         # ----------------------------------
         
-        # O retorno da tupla (dois valores) é o que precisa ser tratado no Pandas
         return first_name, message
 
     # --- CORREÇÃO DO ERRO VALUEERROR ---
+    
+    # 4a. Garante que a coluna de nome não tem valores nulos para evitar falha no apply/split
+    df[COL_NAME] = df[COL_NAME].fillna('')
+    
     # Cria uma coluna temporária com as tuplas (Nome Formatado, Mensagem)
     df['temp_data'] = df.apply(
         lambda row: format_name_and_create_message(row[COL_NAME]), 
         axis=1
     )
     
-    # Usa pd.DataFrame().tolist() para desempacotar as tuplas na ordem correta
-    df[[COL_OUT_NAME, COL_OUT_MSG]] = pd.DataFrame(df['temp_data'].tolist(), index=df.index)
+    # Usa o método .str.split com apply(pd.Series) para desempacotar de forma segura.
+    # O .tolist() era a fonte do erro, o .apply(pd.Series) é mais robusto.
+    temp_df = df['temp_data'].apply(pd.Series)
     
+    # Renomeia e atribui as colunas temporárias
+    df[[COL_OUT_NAME, COL_OUT_MSG]] = temp_df.rename(columns={0: COL_OUT_NAME, 1: COL_OUT_MSG})
+
     # Remove a coluna temporária
     df = df.drop(columns=['temp_data'])
     # -----------------------------------
