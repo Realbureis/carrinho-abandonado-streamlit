@@ -9,8 +9,7 @@ st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas 
 st.title("🎯 Qualificação para Time de Vendas (Jumbo CDP)")
 st.markdown("Filtra pedidos salvos de novos clientes e gera o link de contato com *DESCONTO EXTRA*.")
 
-# --- Definição das Colunas (Ajustar se os nomes mudarem no Excel) ---
-# Estes nomes DEVEM ser os mesmos do seu arquivo Excel/CSV.
+# --- Definição das Colunas ---
 COL_ID = 'Codigo Cliente'
 COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
@@ -33,7 +32,6 @@ def process_data(df_input):
     required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_FILTER, COL_STATUS]
     if not all(col in df.columns for col in required_cols):
         missing = [col for col in required_cols if col not in df.columns]
-        # Retorna erro se faltar colunas, essencial para o Streamlit Cloud
         raise ValueError(f"O arquivo está faltando as seguintes colunas obrigatórias: {', '.join(missing)}")
 
     metrics = {
@@ -48,7 +46,7 @@ def process_data(df_input):
     df = df_unique
     
     # 3. Filtrar pela LÓGICA DE VENDAS: Status='Pedido salvo' E Quant. Pedidos Enviados=0
-    df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) # Coerce NaNs para -1 para garantir que só 0 passe
+    df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) 
     
     df_qualified = df[
         (df[COL_STATUS] == 'Pedido salvo') & 
@@ -68,7 +66,7 @@ def process_data(df_input):
             first_name = str(full_name).strip().split(' ')[0]
             first_name = first_name.capitalize() 
             
-        # --- NOVO TEMPLATE DA MENSAGEM DE VENDAS ---
+        # --- TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
             f"Olá {first_name}! Aqui é a Sofia da Jumbo CDP! 👋\n\n"
             f"Vimos que você iniciou seu cadastro, mas não conseguiu finalizar sua compra na Jumbo CDP, por isso tenho uma ótima notícia para você:\n\n"
@@ -78,12 +76,22 @@ def process_data(df_input):
         )
         # ----------------------------------
         
+        # O retorno da tupla (dois valores) é o que precisa ser tratado no Pandas
         return first_name, message
 
-    # Aplica a função em cada linha
-    df[[COL_OUT_NAME, COL_OUT_MSG]] = df.apply(
-        lambda row: pd.Series(format_name_and_create_message(row[COL_NAME])), axis=1
+    # --- CORREÇÃO DO ERRO VALUEERROR ---
+    # Cria uma coluna temporária com as tuplas (Nome Formatado, Mensagem)
+    df['temp_data'] = df.apply(
+        lambda row: format_name_and_create_message(row[COL_NAME]), 
+        axis=1
     )
+    
+    # Usa pd.DataFrame().tolist() para desempacotar as tuplas na ordem correta
+    df[[COL_OUT_NAME, COL_OUT_MSG]] = pd.DataFrame(df['temp_data'].tolist(), index=df.index)
+    
+    # Remove a coluna temporária
+    df = df.drop(columns=['temp_data'])
+    # -----------------------------------
     
     return df, metrics
 
