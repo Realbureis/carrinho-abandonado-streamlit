@@ -7,16 +7,14 @@ import io
 st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
 
 st.title("🎯 Qualificação para Time de Vendas (Jumbo CDP)")
-st.markdown("Filtra clientes **novos** que possuem **apenas** o status 'Pedido salvo'.")
+st.markdown("Filtra clientes **novos** (sem histórico de compra) que salvaram um pedido.")
 
 # --- Definição das Colunas ---
 COL_ID = 'Codigo Cliente'
 COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
-COL_STATUS = 'Status' 
-# Nome exato da coluna de contagem
 COL_FILTER = 'Quant. Pedidos Enviados' 
-
+COL_STATUS = 'Status' 
 # Colunas de SAÍDA
 COL_OUT_NAME = 'Cliente_Formatado'
 COL_OUT_MSG = 'Mensagem_Personalizada'
@@ -26,12 +24,12 @@ COL_OUT_MSG = 'Mensagem_Personalizada'
 @st.cache_data
 def process_data(df_input):
     """
-    Executa a limpeza, filtro (apenas clientes com status exclusivo 'Pedido salvo' E Quant. Pedidos Enviados == 0) e personalização.
+    Executa a limpeza, filtro (apenas novos clientes com pedido salvo) e personalização.
     """
     df = df_input.copy() 
     
     # 1. Checagem de colunas obrigatórias
-    required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_STATUS, COL_FILTER]
+    required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_FILTER, COL_STATUS]
     if not all(col in df.columns for col in required_cols):
         missing = [col for col in required_cols if col not in df.columns]
         raise ValueError(f"O arquivo está faltando as seguintes colunas obrigatórias: {', '.join(missing)}")
@@ -42,19 +40,25 @@ def process_data(df_input):
         'removed_filter': 0
     }
 
-    # Garante que a coluna de contagem é numérica (tratando erros)
+    # 2. Eliminar Duplicatas (mantém o primeiro pedido salvo de um cliente)
+    df_unique = df.drop_duplicates(subset=[COL_ID], keep='first')
+    metrics['removed_duplicates'] = len(df) - len(df_unique)
+    df = df_unique
+    
+    # --- FILTRO MAIS RIGOROSO (CLIENTE NOVO E PEDIDO SALVO) ---
+    
+    # Garante que a coluna Quant. Pedidos Enviados é numérica
     df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) 
     
-    # 2. --- FILTRO 1: EXCLUSIVIDADE DE STATUS ('PEDIDO SALVO') ---
+    # A. Corrigindo o erro: Identifica clientes que têm PELO MENOS UM status diferente de 'Pedido Salvo'.
+    # Passamos a Series Booleana como a coluna a ser agregada, e o .any() verifica se algum é True.
+    tem_outro_status_series = df[COL_STATUS] != 'Pedido Salvo'
     
-    # Identifica clientes que têm PELO MENOS UM status diferente de 'Pedido salvo'.
-    tem_outro_status = df[COL_STATUS] != 'Pedido Salvo'
+    # Esta é a LINHA CORRIGIDA que resolve o KeyError:
+    clientes_com_outro_status = df.groupby(COL_ID)[COL_ID].transform(lambda x: tem_outro_status_series.loc[x.index].any())
+    # Fim da Linha Corrigida
     
-    # Agrupa por Codigo Cliente e verifica se HÁ alguma linha True.
-    clientes_com_outro_status = df.groupby(COL_ID)[tem_outro_status].transform('any')
-    
-    # 3. --- FILTRO 2: CLIENTE NOVO (QUANTIDADE DE PEDIDOS ENVIADOS == 0) ---
-    
+    # B. Filtra pela lógica
     df_qualified = df[
         # A linha atual deve ser 'Pedido Salvo'
         (df[COL_STATUS] == 'Pedido Salvo') & 
@@ -70,17 +74,15 @@ def process_data(df_input):
     
     # --- CORREÇÕES DE ERRO DE ALINHAMENTO E VAZIO ---
     
-    # A. Eliminar Duplicatas (mantém uma linha por Codigo Cliente)
-    df_unique = df_qualified.drop_duplicates(subset=[COL_ID], keep='first')
-    metrics['removed_duplicates'] = len(df_qualified) - len(df_unique)
-    df = df_unique
+    # A. Redefine o índice para evitar desalinhamento após filtragem (solução do ValueError)
+    df = df_qualified.reset_index(drop=True)
     
-    # B. Redefine o índice para evitar desalinhamento após filtragem (solução do ValueError)
-    df = df.reset_index(drop=True)
-    
-    # C. CHECAGEM DE SEGURANÇA: Retorna imediatamente se não houver leads (solução do Length mismatch)
+    # B. CHECAGEM DE SEGURANÇA: Retorna imediatamente se não houver leads (solução do Length mismatch)
     if df.empty:
         return df, metrics 
+    
+    # C. Eliminar Duplicatas (mantém uma linha por Codigo Cliente)
+    # df_unique já foi filtrado e resetado acima.
     
     # --------------------------------------------------
 
@@ -92,7 +94,7 @@ def process_data(df_input):
             first_name = "Cliente"
         else:
             first_name = str(full_name).strip().split(' ')[0] 
-            first_name = first_name.capitalize() 
+            first_name = full_name.capitalize() 
             
         # --- TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
@@ -195,8 +197,7 @@ if uploaded_file is not None:
                 first_name = row[COL_OUT_NAME]
                 
                 # Prepara o número de telefone (remove tudo exceto dígitos)
-                # Tenta usar Celular, senão usa Fone Fixo
-                phone_raw = str(row.get('Celular') or row[COL_PHONE])
+                phone_raw = str(row[COL_PHONE])
                 phone_number = "".join(filter(str.isdigit, phone_raw))
 
                 message_text = row[COL_OUT_MSG]
