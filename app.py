@@ -47,7 +47,6 @@ def process_data(df_input):
     
     # --- FILTRO MAIS RIGOROSO (CLIENTE NOVO E PEDIDO SALVO) ---
     
-    # Garante que a coluna Quant. Pedidos Enviados é numérica
     df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) 
     
     df_qualified = df[
@@ -57,9 +56,14 @@ def process_data(df_input):
         
     metrics['removed_filter'] = len(df) - len(df_qualified)
     
-    # CORREÇÃO DE ERRO 1: Redefine o índice para evitar desalinhamento após filtragem
+    # CORREÇÃO DE ERRO PRINCIPAL: Redefine o índice para evitar desalinhamento
     df = df_qualified.reset_index(drop=True)
     
+    # --- CHEC GEM DE SEGURANÇA CONTRA DATAFRAME VAZIO (RESOLVE O Length mismatch) ---
+    if df.empty:
+        return df, metrics # Retorna imediatamente se não houver leads
+    # ------------------------------------------------------------------------------------
+
     # 3. Criar mensagem personalizada
     
     def format_name_and_create_message(full_name):
@@ -82,24 +86,21 @@ def process_data(df_input):
         
         return first_name, message
 
-    # --- CORREÇÃO DE ERRO 2: RESOLUÇÃO DO KEYERROR NA ATRIBUIÇÃO ---
+    # --- CORREÇÃO DO ERRO DE ALINHAMENTO ---
     
-    # Garante que a coluna de nome é uma string, preenchendo nulos com string vazia
+    # Garante que a coluna de nome é string
     df[COL_NAME] = df[COL_NAME].astype(str).fillna('')
     
     # Cria a Series com as tuplas
     data_series = df[COL_NAME].apply(format_name_and_create_message)
 
-    # Cria o DataFrame temporário (colunas nomeadas 0 e 1)
+    # Cria o DataFrame temporário, usando o índice sequencial (já corrigido)
     temp_df = pd.DataFrame(data_series.tolist())
     
-    # Renomeia as colunas numéricas (0, 1) para nomes temporários seguros (evitando KeyError)
-    temp_df.columns = ['temp_col_0', 'temp_col_1']
-    
-    # Atribui as colunas renomeadas de volta ao DF principal
-    df[COL_OUT_NAME] = temp_df['temp_col_0']
-    df[COL_OUT_MSG] = temp_df['temp_col_1']
-    # -------------------------------------------------------------------
+    # Atribui as colunas (0 e 1) individualmente
+    df[COL_OUT_NAME] = temp_df[0]
+    df[COL_OUT_MSG] = temp_df[1]
+    # -----------------------------------
     
     return df, metrics
 
