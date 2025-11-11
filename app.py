@@ -4,16 +4,18 @@ from urllib.parse import quote
 import io
 
 # --- Configurações da Aplicação ---
-st.set_page_config(layout="wide", page_title="Processador de Clientes de Cadastro Abandonado")
+st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
 
-st.title("🛒 Processador de Clientes de Cadastro Abandonado")
-st.markdown("Faça o upload do seu relatório e processe os dados para disparo de WhatsApp em 1 clique.")
+st.title("🎯 Qualificação para Time de Vendas (Jumbo CDP)")
+st.markdown("Filtra pedidos salvos de novos clientes e gera o link de contato com *DESCONTO EXTRA*.")
 
-# --- Definição das Colunas ---
+# --- Definição das Colunas (Ajustar se os nomes mudarem no Excel) ---
+# Estes nomes DEVEM ser os mesmos do seu arquivo Excel/CSV.
 COL_ID = 'Codigo Cliente'
 COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
-COL_FILTER = 'Quant. Pedidos Enviados'
+COL_FILTER = 'Quant. Pedidos Enviados' # Para filtrar se o cliente é novo (valor == 0)
+COL_STATUS = 'Status' # Para filtrar se o pedido está 'Pedido salvo'
 # Colunas de SAÍDA
 COL_OUT_NAME = 'Cliente_Formatado'
 COL_OUT_MSG = 'Mensagem_Personalizada'
@@ -23,15 +25,15 @@ COL_OUT_MSG = 'Mensagem_Personalizada'
 @st.cache_data
 def process_data(df_input):
     """
-    Executa a limpeza, filtro e personalização dos dados.
+    Executa a limpeza, filtro (novos clientes com pedido salvo) e personalização.
     """
-    df = df_input.copy()  # Trabalha em uma cópia
-
+    df = df_input.copy() 
+    
     # 1. Checagem de colunas obrigatórias
-    required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_FILTER]
+    required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_FILTER, COL_STATUS]
     if not all(col in df.columns for col in required_cols):
         missing = [col for col in required_cols if col not in df.columns]
-        # Use raise ValueError em vez de st.error em @st.cache_data
+        # Retorna erro se faltar colunas, essencial para o Streamlit Cloud
         raise ValueError(f"O arquivo está faltando as seguintes colunas obrigatórias: {', '.join(missing)}")
 
     metrics = {
@@ -44,13 +46,17 @@ def process_data(df_input):
     df_unique = df.drop_duplicates(subset=[COL_ID], keep='first')
     metrics['removed_duplicates'] = len(df) - len(df_unique)
     df = df_unique
-
-    # 3. Filtrar clientes que JÁ EFETUARAM COMPRA (Quant. Pedidos Enviados > 0)
-    df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(0)
-    df_filtered = df[df[COL_FILTER] <= 0]
-
-    metrics['removed_filter'] = len(df) - len(df_filtered)
-    df = df_filtered
+    
+    # 3. Filtrar pela LÓGICA DE VENDAS: Status='Pedido salvo' E Quant. Pedidos Enviados=0
+    df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) # Coerce NaNs para -1 para garantir que só 0 passe
+    
+    df_qualified = df[
+        (df[COL_STATUS] == 'Pedido salvo') & 
+        (df[COL_FILTER] == 0) # Apenas clientes que nunca compraram
+    ]
+        
+    metrics['removed_filter'] = len(df) - len(df_qualified)
+    df = df_qualified
 
     # 4. Criar mensagem personalizada
     
@@ -62,13 +68,15 @@ def process_data(df_input):
             first_name = str(full_name).strip().split(' ')[0]
             first_name = first_name.capitalize() 
             
-        # --- NOVO TEMPLATE DA MENSAGEM DE CADASTRO ABANDONADO ---
+        # --- NOVO TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
-            f"Olá {first_name}, tudo bem? Aqui é a Sofia da *Jumbo CDP!* 👋\n\n"
-            f"Vimos que você iniciou o cadastro na *Jumbo CDP*, mas não conseguiu finalizar sua compra.\n\n"
-            f"Podemos te ajudar com alguma coisa? Muitas vezes, a *carteirinha de visitante* gera muitas dúvidas."
+            f"Olá {first_name}! Aqui é a Sofia da Jumbo CDP! 👋\n\n"
+            f"Vimos que você iniciou seu cadastro, mas não conseguiu finalizar sua compra na Jumbo CDP, por isso tenho uma ótima notícia para você:\n\n"
+            f"*Consegui um DESCONTO EXTRA de 3%% no PIX* no valor total do seu pedido! 🎁\n\n"
+            f"Sabemos que pontos como a *carteirinha de visitante* ou os *dados do detento* costumam gerar dúvidas.\n\n"
+            f"Para que eu possa *ativar seu desconto e te enviar o passo a passo* para resolver isso de forma rápida, qual foi o principal *obstáculo* que você encontrou no site?"
         )
-        # --------------------------------------------------------
+        # ----------------------------------
         
         return first_name, message
 
@@ -76,16 +84,17 @@ def process_data(df_input):
     df[[COL_OUT_NAME, COL_OUT_MSG]] = df.apply(
         lambda row: pd.Series(format_name_and_create_message(row[COL_NAME])), axis=1
     )
-
+    
     return df, metrics
-
 
 # --- Interface do Usuário (Streamlit) ---
 
 # Seção de Upload
-st.header("1. Upload do Relatório de Clientes (Excel/CSV)")
+st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
+st.markdown("#### Colunas Esperadas: Codigo Cliente, Cliente, Fone Fixo, Quant. Pedidos Enviados, Status")
+
 uploaded_file = st.file_uploader(
-    f"Arraste ou clique para enviar o arquivo. Nomes de colunas esperados: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_FILTER}", 
+    "Arraste ou clique para enviar o arquivo.", 
     type=["csv", "xlsx"]
 )
 
@@ -98,72 +107,67 @@ if uploaded_file is not None:
             df_original = pd.read_excel(uploaded_file, engine='openpyxl')
             
         st.success(f"Arquivo '{uploaded_file.name}' carregado com sucesso!")
-
+        
     except ValueError as ve:
         st.error(f"Erro de Validação: {ve}")
         st.stop()
     except Exception as e:
-        st.error(f"Erro ao ler o arquivo. Verifique o formato e as colunas. Erro: {e}")
+        st.error(f"Erro ao ler o arquivo. Certifique-se que o 'openpyxl' está instalado (ou no requirements.txt). Erro: {e}")
         st.stop()
 
 
     # Botão de Processamento
-    st.header("2. Iniciar Processamento e Filtro")
-    if st.button("🚀 Processar Dados e Preparar Disparos"):
-
-        # Chama a função de processamento
-        try:
-            df_processed, metrics = process_data(df_original)
-        except ValueError as ve:
-            st.error(f"Erro de Processamento: {ve}")
-            st.stop()
+    st.header("2. Iniciar Qualificação de Vendas")
+    if st.button("🚀 Processar Dados e Gerar Leads Prioritários"):
+        
+        df_processed, metrics = process_data(df_original)
         
         # --- Seção de Resultados ---
-        st.header("3. Resultados e Disparo (1-Clique)")
-
+        st.header("3. Lista de Disparo com Condição Especial (1-Clique)")
+        
         col_met1, col_met2, col_met3 = st.columns(3)
         col_met1.metric("Clientes Originais", metrics['original_count'])
-        col_met2.metric("Clientes Removidos (Duplicatas)", metrics['removed_duplicates'])
-        col_met3.metric("Clientes Filtrados (Com Compra)", metrics['removed_filter'])
-
+        col_met2.metric("Removidos (Duplicatas)", metrics['removed_duplicates'])
+        col_met3.metric("Removidos (Fora do Perfil)", metrics['removed_filter'])
+        
         total_ready = len(df_processed)
-        st.subheader(f"Lista Final de Clientes para Disparo ({total_ready} Clientes)")
-
+        st.subheader(f"Leads Prioritários para Vendas ({total_ready} Clientes)")
+        
         if total_ready == 0:
-            st.info("Nenhum cliente atendeu aos critérios de abandono e filtro. Nenhum disparo necessário.")
+            st.info("Nenhum lead encontrado com o perfil: Status='Pedido salvo' E Pedidos Enviados=0.")
         else:
             st.markdown("---")
-            st.markdown("### Clique no botão para abrir o WhatsApp Web/App com a mensagem pronta.")
-
-            # Cria um cabeçalho para a 'tabela'
-            col_headers = st.columns([1.5, 1.5, 7])
+            st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
+            
+            # Cria o layout da tabela de botões
+            col_headers = st.columns([1.5, 1.5, 7]) 
             col_headers[0].markdown("**Nome**")
             col_headers[1].markdown(f"**{COL_FILTER}**")
-            col_headers[2].markdown("**Ação (Disparo)**")
-            st.markdown("---")  # Separador
-
-            # Itera sobre os clientes processados para criar os botões
+            col_headers[2].markdown("**Ação (Disparo de Vendas)**")
+            st.markdown("---")
+            
+            # Itera sobre os leads qualificados
             for index, row in df_processed.iterrows():
-                cols = st.columns([1.5, 1.5, 7])
-
+                cols = st.columns([1.5, 1.5, 7]) 
+                
                 first_name = row[COL_OUT_NAME]
-
+                
                 # Prepara o número de telefone (remove tudo exceto dígitos)
                 phone_raw = str(row[COL_PHONE])
                 phone_number = "".join(filter(str.isdigit, phone_raw))
 
                 message_text = row[COL_OUT_MSG]
                 filter_value = row[COL_FILTER]
-
+                
                 # Cria o link oficial do WhatsApp, codificando a mensagem
                 encoded_message = quote(message_text)
                 whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
-
+                
                 # 1. Exibe os dados
                 cols[0].write(first_name)
                 cols[1].write(f"{filter_value:.0f}")
-
-                # 2. Cria e exibe o botão (usando HTML/CSS para ter a funcionalidade de link)
+                
+                # 2. Cria e exibe o botão
                 button_label = f"WhatsApp para {first_name}"
                 button_html = f"""
                 <a href="{whatsapp_link}" target="_blank" style="
@@ -185,11 +189,11 @@ if uploaded_file is not None:
 
             st.markdown("---")
 
-            # Botão de Download do arquivo final processado
+            # Botão de Download
             csv_data = df_processed.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="📥 Baixar Arquivo CSV dos Clientes Prontos (Log)",
+                label="📥 Baixar Lista de Leads Qualificados (CSV)",
                 data=csv_data,
-                file_name='clientes_prontos_para_disparo.csv',
+                file_name='leads_qualificados_para_vendas.csv',
                 mime='text/csv',
             )
