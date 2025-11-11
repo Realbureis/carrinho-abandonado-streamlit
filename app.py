@@ -7,14 +7,16 @@ import io
 st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
 
 st.title("🎯 Qualificação para Time de Vendas (Jumbo CDP)")
-st.markdown("Filtra clientes **novos** (sem histórico de compra) que salvaram um pedido.")
+st.markdown("Filtra clientes **novos** que possuem **apenas** o status 'Pedido salvo'.")
 
 # --- Definição das Colunas ---
 COL_ID = 'Codigo Cliente'
 COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
-COL_FILTER = 'Quant. Pedidos Enviados' 
 COL_STATUS = 'Status' 
+# Nome exato da coluna de contagem
+COL_FILTER = 'Quant. Pedidos Enviados' 
+
 # Colunas de SAÍDA
 COL_OUT_NAME = 'Cliente_Formatado'
 COL_OUT_MSG = 'Mensagem_Personalizada'
@@ -24,12 +26,12 @@ COL_OUT_MSG = 'Mensagem_Personalizada'
 @st.cache_data
 def process_data(df_input):
     """
-    Executa a limpeza, filtro (apenas novos clientes com pedido salvo) e personalização.
+    Executa a limpeza, filtro (apenas clientes com status exclusivo 'Pedido salvo' E Quant. Pedidos Enviados == 0) e personalização.
     """
     df = df_input.copy() 
     
     # 1. Checagem de colunas obrigatórias
-    required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_FILTER, COL_STATUS]
+    required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_STATUS, COL_FILTER]
     if not all(col in df.columns for col in required_cols):
         missing = [col for col in required_cols if col not in df.columns]
         raise ValueError(f"O arquivo está faltando as seguintes colunas obrigatórias: {', '.join(missing)}")
@@ -40,31 +42,49 @@ def process_data(df_input):
         'removed_filter': 0
     }
 
-    # 2. Eliminar Duplicatas (mantém o primeiro pedido salvo de um cliente)
-    df_unique = df.drop_duplicates(subset=[COL_ID], keep='first')
-    metrics['removed_duplicates'] = len(df) - len(df_unique)
-    df = df_unique
-    
-    # --- FILTRO MAIS RIGOROSO (CLIENTE NOVO E PEDIDO SALVO) ---
-    
+    # Garante que a coluna de contagem é numérica (tratando erros)
     df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) 
     
+    # 2. --- FILTRO 1: EXCLUSIVIDADE DE STATUS ('PEDIDO SALVO') ---
+    
+    # Identifica clientes que têm PELO MENOS UM status diferente de 'Pedido salvo'.
+    tem_outro_status = df[COL_STATUS] != 'Pedido Salvo'
+    
+    # Agrupa por Codigo Cliente e verifica se HÁ alguma linha True.
+    clientes_com_outro_status = df.groupby(COL_ID)[tem_outro_status].transform('any')
+    
+    # 3. --- FILTRO 2: CLIENTE NOVO (QUANTIDADE DE PEDIDOS ENVIADOS == 0) ---
+    
     df_qualified = df[
-        (df[COL_STATUS] == 'Pedido salvo') & 
-        (df[COL_FILTER] == 0) # APENAS clientes que nunca enviaram pedido
+        # A linha atual deve ser 'Pedido Salvo'
+        (df[COL_STATUS] == 'Pedido Salvo') & 
+        
+        # O cliente (Codigo Cliente) NÃO pode ter tido NENHUM outro status (exclusividade)
+        (~clientes_com_outro_status) & 
+        
+        # A contagem de pedidos enviados deve ser 0 (garantindo que é um cliente novo/tentativa)
+        (df[COL_FILTER] == 0) 
     ]
         
-    metrics['removed_filter'] = len(df) - len(df_qualified)
+    metrics['removed_filter'] = len(df_input) - len(df_qualified)
     
-    # CORREÇÃO DE ERRO PRINCIPAL: Redefine o índice para evitar desalinhamento
-    df = df_qualified.reset_index(drop=True)
+    # --- CORREÇÕES DE ERRO DE ALINHAMENTO E VAZIO ---
     
-    # --- CHEC GEM DE SEGURANÇA CONTRA DATAFRAME VAZIO (RESOLVE O Length mismatch) ---
+    # A. Eliminar Duplicatas (mantém uma linha por Codigo Cliente)
+    df_unique = df_qualified.drop_duplicates(subset=[COL_ID], keep='first')
+    metrics['removed_duplicates'] = len(df_qualified) - len(df_unique)
+    df = df_unique
+    
+    # B. Redefine o índice para evitar desalinhamento após filtragem (solução do ValueError)
+    df = df.reset_index(drop=True)
+    
+    # C. CHECAGEM DE SEGURANÇA: Retorna imediatamente se não houver leads (solução do Length mismatch)
     if df.empty:
-        return df, metrics # Retorna imediatamente se não houver leads
-    # ------------------------------------------------------------------------------------
+        return df, metrics 
+    
+    # --------------------------------------------------
 
-    # 3. Criar mensagem personalizada
+    # 4. Criar mensagem personalizada
     
     def format_name_and_create_message(full_name):
         """Formata o nome e cria a mensagem."""
@@ -86,7 +106,7 @@ def process_data(df_input):
         
         return first_name, message
 
-    # --- CORREÇÃO DO ERRO DE ALINHAMENTO ---
+    # --- CORREÇÃO DE ERRO DE ATRIBUIÇÃO (KEYERROR) ---
     
     # Garante que a coluna de nome é string
     df[COL_NAME] = df[COL_NAME].astype(str).fillna('')
@@ -94,13 +114,13 @@ def process_data(df_input):
     # Cria a Series com as tuplas
     data_series = df[COL_NAME].apply(format_name_and_create_message)
 
-    # Cria o DataFrame temporário, usando o índice sequencial (já corrigido)
-    temp_df = pd.DataFrame(data_series.tolist())
+    # Cria o DataFrame temporário (colunas nomeadas 0 e 1)
+    temp_df = pd.DataFrame(data_series.tolist()) 
     
     # Atribui as colunas (0 e 1) individualmente
     df[COL_OUT_NAME] = temp_df[0]
     df[COL_OUT_MSG] = temp_df[1]
-    # -----------------------------------
+    # ---------------------------------------------------
     
     return df, metrics
 
@@ -108,7 +128,7 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-st.markdown("#### Colunas Esperadas: Codigo Cliente, Cliente, Fone Fixo, Quant. Pedidos Enviados, Status")
+st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}")
 
 uploaded_file = st.file_uploader(
     "Arraste ou clique para enviar o arquivo.", 
@@ -121,15 +141,16 @@ if uploaded_file is not None:
         if uploaded_file.name.endswith('.csv'):
             df_original = pd.read_csv(uploaded_file)
         else:
+            # Tenta ler o excel com a dependência openpyxl
             df_original = pd.read_excel(uploaded_file, engine='openpyxl')
             
         st.success(f"Arquivo '{uploaded_file.name}' carregado com sucesso!")
         
-    except ValueError as ve:
-        st.error(f"Erro de Validação: {ve}")
-        st.stop()
     except Exception as e:
-        st.error(f"Erro ao ler o arquivo. Erro: {e}")
+        if 'openpyxl' in str(e):
+             st.error("Erro ao ler o arquivo Excel (.xlsx). Certifique-se de que a biblioteca 'openpyxl' está instalada no ambiente de execução do seu aplicativo (via requirements.txt).")
+        else:
+            st.error(f"Erro ao ler o arquivo. Erro: {e}")
         st.stop()
 
 
@@ -149,13 +170,13 @@ if uploaded_file is not None:
         col_met1, col_met2, col_met3 = st.columns(3)
         col_met1.metric("Clientes Originais", metrics['original_count'])
         col_met2.metric("Removidos (Duplicatas)", metrics['removed_duplicates'])
-        col_met3.metric("Removidos (Clientes Antigos/Outros Status)", metrics['removed_filter'])
+        col_met3.metric("Removidos (Outros Status/Filtro)", metrics['removed_filter'])
         
         total_ready = len(df_processed)
         st.subheader(f"Leads Prioritários para Vendas ({total_ready} Clientes)")
         
         if total_ready == 0:
-            st.info("Nenhum lead encontrado com o perfil: Pedido Salvo E Cliente Novo.")
+            st.info("Nenhum lead encontrado com o perfil: Apenas 'Pedido Salvo' E 'Quant. Pedidos Enviados' == 0.")
         else:
             st.markdown("---")
             st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
@@ -163,7 +184,7 @@ if uploaded_file is not None:
             # Cria o layout da tabela de botões
             col_headers = st.columns([1.5, 1.5, 7]) 
             col_headers[0].markdown("**Nome**")
-            col_headers[1].markdown(f"**{COL_FILTER}**") # Exibe o Quant. Pedidos Enviados (0)
+            col_headers[1].markdown(f"**{COL_FILTER}**") 
             col_headers[2].markdown("**Ação (Disparo de Vendas)**")
             st.markdown("---")
             
@@ -174,7 +195,8 @@ if uploaded_file is not None:
                 first_name = row[COL_OUT_NAME]
                 
                 # Prepara o número de telefone (remove tudo exceto dígitos)
-                phone_raw = str(row[COL_PHONE])
+                # Tenta usar Celular, senão usa Fone Fixo
+                phone_raw = str(row.get('Celular') or row[COL_PHONE])
                 phone_number = "".join(filter(str.isdigit, phone_raw))
 
                 message_text = row[COL_OUT_MSG]
@@ -182,7 +204,7 @@ if uploaded_file is not None:
                 
                 # Cria o link oficial do WhatsApp, codificando a mensagem
                 encoded_message = quote(message_text)
-                whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
+                whatsapp_link = f"https://wa.me/55{phone_number}?text={encoded_message}"
                 
                 # 1. Exibe os dados
                 cols[0].write(first_name)
