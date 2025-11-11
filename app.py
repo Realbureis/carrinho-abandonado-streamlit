@@ -7,7 +7,7 @@ import io
 st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
 
 st.title("🎯 Qualificação para Time de Vendas (Jumbo CDP)")
-st.markdown("Filtra pedidos salvos de novos clientes e gera o link de contato com *DESCONTO EXTRA*.")
+st.markdown("Filtra clientes **novos** (sem histórico de compra) que salvaram um pedido.")
 
 # --- Definição das Colunas ---
 COL_ID = 'Codigo Cliente'
@@ -24,7 +24,7 @@ COL_OUT_MSG = 'Mensagem_Personalizada'
 @st.cache_data
 def process_data(df_input):
     """
-    Executa a limpeza, filtro (novos clientes com pedido salvo) e personalização.
+    Executa a limpeza, filtro (apenas novos clientes com pedido salvo) e personalização.
     """
     df = df_input.copy() 
     
@@ -40,27 +40,29 @@ def process_data(df_input):
         'removed_filter': 0
     }
 
-    # 2. Eliminar Duplicatas (Codigo Cliente)
+    # 2. Eliminar Duplicatas (mantém o primeiro pedido salvo de um cliente)
     df_unique = df.drop_duplicates(subset=[COL_ID], keep='first')
     metrics['removed_duplicates'] = len(df) - len(df_unique)
     df = df_unique
     
-    # 3. Filtrar pela LÓGICA DE VENDAS: Status='Pedido salvo' E Quant. Pedidos Enviados=0
+    # --- FILTRO MAIS RIGOROSO (CLIENTE NOVO E PEDIDO SALVO) ---
+    
+    # Garante que a coluna Quant. Pedidos Enviados é numérica
     df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) 
     
     df_qualified = df[
         (df[COL_STATUS] == 'Pedido salvo') & 
-        (df[COL_FILTER] == 0)
+        (df[COL_FILTER] == 0) # APENAS clientes que nunca enviaram pedido
     ]
         
     metrics['removed_filter'] = len(df) - len(df_qualified)
     df = df_qualified
 
-    # 4. Criar mensagem personalizada
+    # 3. Criar mensagem personalizada
     
     def format_name_and_create_message(full_name):
         """Formata o nome e cria a mensagem."""
-        if pd.isna(full_name) or full_name == '':
+        if not full_name:
             first_name = "Cliente"
         else:
             first_name = str(full_name).strip().split(' ')[0] 
@@ -78,19 +80,18 @@ def process_data(df_input):
         
         return first_name, message
 
-    # --- CORREÇÃO FINAL DO ERRO VALUEERROR/TYPEERROR ---
+    # --- CORREÇÃO DO ERRO DE ALINHAMENTO DE COLUNAS ---
     
-    # 4a. Garante que a coluna de nome não tem valores nulos
-    df[COL_NAME] = df[COL_NAME].fillna('')
+    # Garante que a coluna de nome é uma string, preenchendo nulos com string vazia
+    df[COL_NAME] = df[COL_NAME].astype(str).fillna('')
     
-    # Cria uma Series com as tuplas (Nome Formatado, Mensagem)
+    # Cria a Series com as tuplas (Nome Formatado, Mensagem)
     data_series = df[COL_NAME].apply(format_name_and_create_message)
 
-    # CRIAÇÃO DEFINITIVA DO DATAFRAME TEMPORÁRIO COM ÍNDICE ALINHADO
-    # Cria o DataFrame a partir da lista de tuplas, usando o índice do DF filtrado
+    # Cria o DataFrame temporário, usando o índice do DF filtrado
     temp_df = pd.DataFrame(data_series.tolist(), index=df.index)
     
-    # Atribui as colunas (0 e 1) individualmente para evitar o erro de alinhamento de chaves
+    # Atribui as colunas (0 e 1) individualmente
     df[COL_OUT_NAME] = temp_df[0]
     df[COL_OUT_MSG] = temp_df[1]
     # -----------------------------------
@@ -122,7 +123,7 @@ if uploaded_file is not None:
         st.error(f"Erro de Validação: {ve}")
         st.stop()
     except Exception as e:
-        st.error(f"Erro ao ler o arquivo. Certifique-se que o 'openpyxl' está instalado (ou no requirements.txt). Erro: {e}")
+        st.error(f"Erro ao ler o arquivo. Erro: {e}")
         st.stop()
 
 
@@ -130,7 +131,11 @@ if uploaded_file is not None:
     st.header("2. Iniciar Qualificação de Vendas")
     if st.button("🚀 Processar Dados e Gerar Leads Prioritários"):
         
-        df_processed, metrics = process_data(df_original)
+        try:
+            df_processed, metrics = process_data(df_original)
+        except ValueError as ve:
+            st.error(f"Erro de Processamento: {ve}")
+            st.stop()
         
         # --- Seção de Resultados ---
         st.header("3. Lista de Disparo com Condição Especial (1-Clique)")
@@ -138,13 +143,13 @@ if uploaded_file is not None:
         col_met1, col_met2, col_met3 = st.columns(3)
         col_met1.metric("Clientes Originais", metrics['original_count'])
         col_met2.metric("Removidos (Duplicatas)", metrics['removed_duplicates'])
-        col_met3.metric("Removidos (Fora do Perfil)", metrics['removed_filter'])
+        col_met3.metric("Removidos (Clientes Antigos/Outros Status)", metrics['removed_filter'])
         
         total_ready = len(df_processed)
         st.subheader(f"Leads Prioritários para Vendas ({total_ready} Clientes)")
         
         if total_ready == 0:
-            st.info("Nenhum lead encontrado com o perfil: Status='Pedido salvo' E Pedidos Enviados=0.")
+            st.info("Nenhum lead encontrado com o perfil: Pedido Salvo E Cliente Novo.")
         else:
             st.markdown("---")
             st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
@@ -152,7 +157,7 @@ if uploaded_file is not None:
             # Cria o layout da tabela de botões
             col_headers = st.columns([1.5, 1.5, 7]) 
             col_headers[0].markdown("**Nome**")
-            col_headers[1].markdown(f"**{COL_FILTER}**")
+            col_headers[1].markdown(f"**{COL_FILTER}**") # Exibe o Quant. Pedidos Enviados (0)
             col_headers[2].markdown("**Ação (Disparo de Vendas)**")
             st.markdown("---")
             
