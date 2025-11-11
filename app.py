@@ -56,7 +56,10 @@ def process_data(df_input):
     ]
         
     metrics['removed_filter'] = len(df) - len(df_qualified)
-    df = df_qualified
+    
+    # --- CORREÇÃO DE ERRO PRINCIPAL: REDEFINIÇÃO DE ÍNDICE ---
+    df = df_qualified.reset_index(drop=True)
+    # --------------------------------------------------------
 
     # 3. Criar mensagem personalizada
     
@@ -80,7 +83,7 @@ def process_data(df_input):
         
         return first_name, message
 
-    # --- CORREÇÃO DO ERRO DE ALINHAMENTO DE COLUNAS ---
+    # --- INÍCIO DO BLOCO DE ATRIBUIÇÃO CORRIGIDO ---
     
     # Garante que a coluna de nome é uma string, preenchendo nulos com string vazia
     df[COL_NAME] = df[COL_NAME].astype(str).fillna('')
@@ -88,13 +91,13 @@ def process_data(df_input):
     # Cria a Series com as tuplas (Nome Formatado, Mensagem)
     data_series = df[COL_NAME].apply(format_name_and_create_message)
 
-    # Cria o DataFrame temporário, usando o índice do DF filtrado
-    temp_df = pd.DataFrame(data_series.tolist(), index=df.index)
+    # Cria o DataFrame temporário, com o índice sequencial garantido pelo reset_index
+    temp_df = pd.DataFrame(data_series.tolist())
     
     # Atribui as colunas (0 e 1) individualmente
     df[COL_OUT_NAME] = temp_df[0]
     df[COL_OUT_MSG] = temp_df[1]
-    # -----------------------------------
+    # ----------------------------------------------
     
     return df, metrics
 
