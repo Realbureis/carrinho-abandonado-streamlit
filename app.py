@@ -83,14 +83,16 @@ def process_data(df_input):
     # 4a. Garante que a coluna de nome não tem valores nulos
     df[COL_NAME] = df[COL_NAME].fillna('')
     
-    # Cria uma nova coluna aplicando a função, resultando em uma Series de tuplas
+    # Cria uma Series com as tuplas (Nome Formatado, Mensagem)
     data_series = df[COL_NAME].apply(format_name_and_create_message)
 
-    # Converte a Series de tuplas em um DataFrame com o índice correto
+    # CRIAÇÃO DEFINITIVA DO DATAFRAME TEMPORÁRIO COM ÍNDICE ALINHADO
+    # Cria o DataFrame a partir da lista de tuplas, usando o índice do DF filtrado
     temp_df = pd.DataFrame(data_series.tolist(), index=df.index)
     
-    # Atribui as colunas renomeadas de volta ao DataFrame principal
-    df[[COL_OUT_NAME, COL_OUT_MSG]] = temp_df.rename(columns={0: COL_OUT_NAME, 1: COL_OUT_MSG})
+    # Atribui as colunas (0 e 1) individualmente para evitar o erro de alinhamento de chaves
+    df[COL_OUT_NAME] = temp_df[0]
+    df[COL_OUT_MSG] = temp_df[1]
     # -----------------------------------
     
     return df, metrics
