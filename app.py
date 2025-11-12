@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 from urllib.parse import quote
 import io
-import unidecode # Necessário para remover acentos antes de processar
+# Sem a dependência 'unidecode' para evitar ModuleNotFoundError
 
 # --- Configurações da Aplicação ---
 st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
 
-st.title("🎯 Qualificação para Time de Vendas (Jumbo CDP)")
+st.title("Qualificação para Time de Vendas (Jumbo CDP)")
 st.markdown("Filtra clientes **novos** (sem histórico de compra) que salvaram um pedido.")
 
 # --- Definição das Colunas ---
@@ -82,20 +82,19 @@ def process_data(df_input):
         if not full_name:
             first_name = "Cliente"
         else:
-            # 1. Remove acentos e converte para string
-            full_name_str = unidecode.unidecode(str(full_name)).strip() 
-            # 2. Pega APENAS o primeiro nome e capitaliza.
+            full_name_str = str(full_name).strip()
+            # Pega APENAS o primeiro nome e capitaliza.
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- TEMPLATE DA MENSAGEM DE VENDAS ---
+        # --- TEMPLATE DA MENSAGEM DE VENDAS (SEM EMOJIS) ---
         message = (
-            f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* 👋\n\n"
-            f"Tenho uma ótima notícia para você. 🎁\n"
+            f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* \n\n"
+            f"Tenho uma ótima notícia para você. \n"
             f"Vimos que você iniciou seu cadastro, mas não conseguiu finalizar sua compra.\n\n"
             f"Para eu te ajudar, poderia me contar o motivo? \n"
             f"Muitas vezes é o valor do frete e falta de informações do detento.\n\n"
-            f"*Me avise pois consegui um BRINDE ESPECIAL* para incluir no seu pedido! 🎁"
+            f"*Me avise pois consegui um BRINDE ESPECIAL* para incluir no seu pedido!"
         )
         # ----------------------------------
         
@@ -112,7 +111,7 @@ def process_data(df_input):
     # Cria o DataFrame temporário (colunas nomeadas 0 e 1)
     temp_df = pd.DataFrame(data_series.tolist()) 
     
-    # Atribui as colunas (0 e 1) individualmente (solução final para o erro de atribuição)
+    # Atribui as colunas (0 e 1) individualmente
     df[COL_OUT_NAME] = temp_df[0]
     df[COL_OUT_MSG] = temp_df[1]
     
@@ -132,7 +131,7 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, **N. Pedido**, {COL_TOTAL_VALUE}")
+st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, N. Pedido, {COL_TOTAL_VALUE}")
 
 uploaded_file = st.file_uploader(
     "Arraste ou clique para enviar o arquivo.", 
@@ -233,7 +232,7 @@ if uploaded_file is not None:
                     cursor: pointer;
                     white-space: nowrap;
                 ">
-                {button_label} 💬
+                {button_label}
                 </a>
                 """
                 cols[4].markdown(button_html, unsafe_allow_html=True)
