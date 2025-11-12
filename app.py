@@ -86,12 +86,12 @@ def process_data(df_input):
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- NOVO TEMPLATE DA MENSAGEM DE VENDAS ---
+        # --- TEMPLATE DA MENSAGEM DE VENDAS (Espaçamento Corrigido) ---
         message = (
             f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* \n"
             f"Tenho uma ótima notícia para você. \n"
             f"Vimos que você iniciou seu cadastro, mas não conseguiu finalizar sua compra.\n\n"
-            f"Para eu te ajudar, poderia me contar o motivo? \n"
+            f"Para eu te ajudar, poderia me contar o motivo? \n\n" # <--- AQUI ESTÁ A CORREÇÃO (DUPLO \n)
             f"*Me avise pois consegui um BRINDE ESPECIAL* para incluir no seu pedido!"
         )
         # ----------------------------------
