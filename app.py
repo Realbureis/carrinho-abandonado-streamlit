@@ -53,14 +53,20 @@ def process_data(df_input):
     df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) 
     
     # A. Identifica clientes que têm PELO MENOS UM status diferente de 'Pedido Salvo'.
-    tem_outro_status_series = df[COL_STATUS] != 'Pedido Salvo'
+    # CORREÇÃO: A string 'Pedido Salvo' deve ser EXATAMENTE como está na sua planilha
+    tem_outro_status_series = df[COL_STATUS] != 'Pedido Salvo' 
     clientes_com_outro_status = df.groupby(COL_ID)[COL_ID].transform(lambda x: tem_outro_status_series.loc[x.index].any())
     
     # B. Filtra pela lógica
     df_qualified = df[
+        # A linha atual DEVE ser 'Pedido Salvo'
         (df[COL_STATUS] == 'Pedido Salvo') & 
+        
+        # O cliente (Codigo Cliente) NÃO pode ter tido NENHUM outro status (exclusividade)
         (~clientes_com_outro_status) & 
-        (df[COL_FILTER] == 0) # APENAS clientes que nunca enviaram pedido
+        
+        # A contagem de pedidos enviados deve ser 0 (garantindo que é um cliente novo/tentativa)
+        (df[COL_FILTER] == 0) 
     ]
         
     metrics['removed_filter'] = len(df_input) - len(df_qualified)
@@ -82,7 +88,7 @@ def process_data(df_input):
             first_name = "Cliente"
         else:
             full_name_str = str(full_name).strip()
-            # CORREÇÃO FINAL: Pega APENAS o primeiro nome e capitaliza.
+            # Pega APENAS o primeiro nome e capitaliza.
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
@@ -110,14 +116,13 @@ def process_data(df_input):
     # Cria o DataFrame temporário (colunas nomeadas 0 e 1)
     temp_df = pd.DataFrame(data_series.tolist()) 
     
-    # Atribui as colunas (0 e 1) individualmente (solução final para o erro de atribuição)
+    # Atribui as colunas (0 e 1) individualmente
     df[COL_OUT_NAME] = temp_df[0]
     df[COL_OUT_MSG] = temp_df[1]
     
     # 5. Formatar valor total para exibição
     def format_brl(value):
         try:
-            # Remove R$ e , e converte para float antes de formatar
             value_str = str(value).replace('R$', '').replace('.', '').replace(',', '.')
             return f"R$ {float(value_str):.2f}".replace('.', ',')
         except:
