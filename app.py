@@ -2,12 +2,11 @@ import streamlit as st
 import pandas as pd
 from urllib.parse import quote
 import io
-# Sem a dependência 'unidecode' para evitar ModuleNotFoundError
 
 # --- Configurações da Aplicação ---
 st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
 
-st.title("Qualificação para Time de Vendas (Jumbo CDP)")
+st.title("🎯 Qualificação para Time de Vendas (Jumbo CDP)")
 st.markdown("Filtra clientes **novos** (sem histórico de compra) que salvaram um pedido.")
 
 # --- Definição das Colunas ---
@@ -87,7 +86,7 @@ def process_data(df_input):
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- TEMPLATE DA MENSAGEM DE VENDAS (SEM EMOJIS) ---
+        # --- NOVO TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
             f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* \n\n"
             f"Tenho uma ótima notícia para você. \n"
@@ -131,7 +130,7 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, N. Pedido, {COL_TOTAL_VALUE}")
+st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, **N. Pedido**, {COL_TOTAL_VALUE}")
 
 uploaded_file = st.file_uploader(
     "Arraste ou clique para enviar o arquivo.", 
