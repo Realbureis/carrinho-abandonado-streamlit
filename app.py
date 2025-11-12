@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from urllib.parse import quote
 import io
+import unidecode # Necessário para remover acentos antes de processar
 
 # --- Configurações da Aplicação ---
 st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
@@ -15,7 +16,6 @@ COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
 COL_FILTER = 'Quant. Pedidos Enviados' 
 COL_STATUS = 'Status' 
-# CORREÇÃO CRÍTICA: Ajuste para P maiúsculo para corresponder ao Excel
 COL_ORDER_ID = 'N. Pedido' 
 COL_TOTAL_VALUE = 'Valor Total' 
 # Colunas de SAÍDA
@@ -82,12 +82,12 @@ def process_data(df_input):
         if not full_name:
             first_name = "Cliente"
         else:
-            full_name_str = str(full_name).strip()
-            # Pega APENAS o primeiro nome e capitaliza.
+            # Garante que o nome é uma string e remove acentos antes de processar
+            full_name_str = unidecode.unidecode(str(full_name)).strip() 
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- TEMPLATE DA MENSAGEM DE VENDAS ---
+        # --- TEMPLATE DA MENSAGEM DE VENDAS (Emojis corrigidos) ---
         message = (
             f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* 👋\n\n"
             f"Tenho uma ótima notícia para você. 🎁\n"
@@ -131,7 +131,6 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-# AQUI USAMOS A NOTAÇÃO CORRETA PARA INFORMAR O USUÁRIO
 st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, **N. Pedido**, {COL_TOTAL_VALUE}")
 
 uploaded_file = st.file_uploader(
@@ -162,6 +161,10 @@ if uploaded_file is not None:
     if st.button("🚀 Processar Dados e Gerar Leads Prioritários"):
         
         try:
+            # Instala a dependência unidecode (necessária para a correção de acentos no nome)
+            import subprocess
+            subprocess.run(["pip", "install", "unidecode"])
+            
             df_processed, metrics = process_data(df_original)
         except ValueError as ve:
             st.error(f"Erro de Processamento: {ve}")
