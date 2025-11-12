@@ -15,7 +15,8 @@ COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
 COL_FILTER = 'Quant. Pedidos Enviados' 
 COL_STATUS = 'Status' 
-COL_ORDER_ID = 'N. pedido' 
+# CORREÇÃO CRÍTICA: Ajuste para P maiúsculo para corresponder ao Excel
+COL_ORDER_ID = 'N. Pedido' 
 COL_TOTAL_VALUE = 'Valor Total' 
 # Colunas de SAÍDA
 COL_OUT_NAME = 'Cliente_Formatado'
@@ -53,20 +54,14 @@ def process_data(df_input):
     df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) 
     
     # A. Identifica clientes que têm PELO MENOS UM status diferente de 'Pedido Salvo'.
-    # CORREÇÃO: A string 'Pedido Salvo' deve ser EXATAMENTE como está na sua planilha
-    tem_outro_status_series = df[COL_STATUS] != 'Pedido Salvo' 
+    tem_outro_status_series = df[COL_STATUS] != 'Pedido Salvo'
     clientes_com_outro_status = df.groupby(COL_ID)[COL_ID].transform(lambda x: tem_outro_status_series.loc[x.index].any())
     
     # B. Filtra pela lógica
     df_qualified = df[
-        # A linha atual DEVE ser 'Pedido Salvo'
         (df[COL_STATUS] == 'Pedido Salvo') & 
-        
-        # O cliente (Codigo Cliente) NÃO pode ter tido NENHUM outro status (exclusividade)
         (~clientes_com_outro_status) & 
-        
-        # A contagem de pedidos enviados deve ser 0 (garantindo que é um cliente novo/tentativa)
-        (df[COL_FILTER] == 0) 
+        (df[COL_FILTER] == 0) # APENAS clientes que nunca enviaram pedido
     ]
         
     metrics['removed_filter'] = len(df_input) - len(df_qualified)
@@ -136,7 +131,8 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, {COL_ORDER_ID}, {COL_TOTAL_VALUE}")
+# AQUI USAMOS A NOTAÇÃO CORRETA PARA INFORMAR O USUÁRIO
+st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, **N. Pedido**, {COL_TOTAL_VALUE}")
 
 uploaded_file = st.file_uploader(
     "Arraste ou clique para enviar o arquivo.", 
