@@ -15,7 +15,7 @@ COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
 COL_FILTER = 'Quant. Pedidos Enviados' 
 COL_STATUS = 'Status' 
-COL_ORDER_ID = 'N. Pedido' # CORREÇÃO: P maiúsculo
+COL_ORDER_ID = 'N. pedido' 
 COL_TOTAL_VALUE = 'Valor Total' 
 # Colunas de SAÍDA
 COL_OUT_NAME = 'Cliente_Formatado'
@@ -82,24 +82,24 @@ def process_data(df_input):
             first_name = "Cliente"
         else:
             full_name_str = str(full_name).strip()
-            
-            # Pega APENAS o primeiro nome e capitaliza.
+            # CORREÇÃO FINAL: Pega APENAS o primeiro nome e capitaliza.
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
         # --- TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
-            f"Olá {first_name}! Aqui é a Sofia da Jumbo CDP! 👋\n\n"
-            f"Vimos que você iniciou seu cadastro, mas não conseguiu finalizar sua compra na Jumbo CDP, por isso tenho uma ótima notícia para você:\n\n"
-            f"*Consegui um DESCONTO EXTRA de 3%% no PIX* no valor total do seu pedido! 🎁\n\n"
-            f"Sabemos que pontos como a *carteirinha de visitante* ou os *dados do detento* costumam gerar dúvidas.\n\n"
-            f"Para que eu possa *ativar seu desconto e te enviar o passo a passo* para resolver isso de forma rápida, qual foi o principal *obstáculo* que você encontrou no site?"
+            f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* 👋\n\n"
+            f"Tenho uma ótima notícia para você. 🎁\n"
+            f"Vimos que você iniciou seu cadastro, mas não conseguiu finalizar sua compra.\n\n"
+            f"Para eu te ajudar, poderia me contar o motivo? \n"
+            f"Muitas vezes é o valor do frete e falta de informações do detento.\n\n"
+            f"*Me avise pois consegui um BRINDE ESPECIAL* para incluir no seu pedido! 🎁"
         )
         # ----------------------------------
         
         return first_name, message
 
-    # --- ATRIBUIÇÃO DE COLUNAS DE SAÍDA (Com correção de alinhamento) ---
+    # --- ATRIBUIÇÃO DE COLUNAS CORRIGIDA ---
     
     # Garante que a coluna de nome é string
     df[COL_NAME] = df[COL_NAME].astype(str).fillna('')
@@ -110,18 +110,16 @@ def process_data(df_input):
     # Cria o DataFrame temporário (colunas nomeadas 0 e 1)
     temp_df = pd.DataFrame(data_series.tolist()) 
     
-    # Atribui as colunas (0 e 1) individualmente
+    # Atribui as colunas (0 e 1) individualmente (solução final para o erro de atribuição)
     df[COL_OUT_NAME] = temp_df[0]
     df[COL_OUT_MSG] = temp_df[1]
     
-    # 5. Formatar valor total para exibição no dashboard e exportação
+    # 5. Formatar valor total para exibição
     def format_brl(value):
         try:
-            # Tenta limpar formatações de R$ e vírgulas para garantir que a conversão para float funcione
-            val_str = str(value).replace('R$', '').replace('.', '').replace(',', '.').strip()
-            val_float = float(val_str)
-            # Formata de volta para BRL com vírgula como separador decimal (para exibição)
-            return f"R$ {val_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            # Remove R$ e , e converte para float antes de formatar
+            value_str = str(value).replace('R$', '').replace('.', '').replace(',', '.')
+            return f"R$ {float(value_str):.2f}".replace('.', ',')
         except:
             return str(value)
 
@@ -133,8 +131,7 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-# Colunas esperadas exibidas na interface
-st.markdown(f"#### Colunas Esperadas: **{COL_ID}**, **{COL_NAME}**, **{COL_PHONE}**, **{COL_STATUS}**, **{COL_FILTER}**, **{COL_ORDER_ID}**, **{COL_TOTAL_VALUE}**")
+st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, {COL_ORDER_ID}, {COL_TOTAL_VALUE}")
 
 uploaded_file = st.file_uploader(
     "Arraste ou clique para enviar o arquivo.", 
@@ -186,7 +183,7 @@ if uploaded_file is not None:
             st.markdown("---")
             st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
             
-            # --- Layout da Tabela com as NOVAS COLUNAS ---
+            # Cria o layout da tabela de botões
             col_headers = st.columns([1.5, 1, 1.5, 1.5, 5]) 
             col_headers[0].markdown("**Nome**")
             col_headers[1].markdown(f"**{COL_FILTER}**") 
@@ -197,7 +194,7 @@ if uploaded_file is not None:
             
             # Itera sobre os leads qualificados
             for index, row in df_processed.iterrows():
-                cols = st.columns([1.5, 1, 1.5, 1.5, 5])
+                cols = st.columns([1.5, 1, 1.5, 1.5, 5]) 
                 
                 first_name = row[COL_OUT_NAME]
                 
@@ -208,7 +205,7 @@ if uploaded_file is not None:
                 message_text = row[COL_OUT_MSG]
                 filter_value = row[COL_FILTER]
                 order_id = row[COL_ORDER_ID] 
-                valor_brl = row['Valor_BRL'] # Campo formatado
+                valor_brl = row['Valor_BRL'] 
                 
                 # Cria o link oficial do WhatsApp, codificando a mensagem
                 encoded_message = quote(message_text)
@@ -218,7 +215,7 @@ if uploaded_file is not None:
                 cols[0].write(first_name)
                 cols[1].write(f"{filter_value:.0f}")
                 cols[2].write(order_id)
-                cols[3].write(valor_brl) 
+                cols[3].write(valor_brl)
                 
                 # 2. Cria e exibe o botão
                 button_label = f"WhatsApp para {first_name}"
@@ -243,8 +240,9 @@ if uploaded_file is not None:
             st.markdown("---")
 
             # Botão de Download
-            # Garante que as colunas corretas sejam exportadas
-            df_export = df_processed.drop(columns=[COL_TOTAL_VALUE]).rename(columns={'Valor_BRL': COL_TOTAL_VALUE}) 
+            df_export = df_processed.drop(columns=['Valor_BRL']).rename(columns={COL_TOTAL_VALUE: COL_TOTAL_VALUE + '_Original'})
+            df_export.insert(df_export.columns.get_loc(COL_TOTAL_VALUE + '_Original') + 1, 'Valor Total Formatado', df_processed['Valor_BRL'])
+
 
             csv_data = df_export.to_csv(index=False, sep=';', encoding='utf-8').encode('utf-8')
             st.download_button(
