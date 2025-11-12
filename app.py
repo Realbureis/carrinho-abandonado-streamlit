@@ -15,6 +15,8 @@ COL_NAME = 'Cliente'
 COL_PHONE = 'Fone Fixo'
 COL_FILTER = 'Quant. Pedidos Enviados' 
 COL_STATUS = 'Status' 
+COL_ORDER_ID = 'N. Pedido' # CORREÇÃO: P maiúsculo
+COL_TOTAL_VALUE = 'Valor Total' 
 # Colunas de SAÍDA
 COL_OUT_NAME = 'Cliente_Formatado'
 COL_OUT_MSG = 'Mensagem_Personalizada'
@@ -29,7 +31,7 @@ def process_data(df_input):
     df = df_input.copy() 
     
     # 1. Checagem de colunas obrigatórias
-    required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_FILTER, COL_STATUS]
+    required_cols = [COL_ID, COL_NAME, COL_PHONE, COL_FILTER, COL_STATUS, COL_ORDER_ID, COL_TOTAL_VALUE]
     if not all(col in df.columns for col in required_cols):
         missing = [col for col in required_cols if col not in df.columns]
         raise ValueError(f"O arquivo está faltando as seguintes colunas obrigatórias: {', '.join(missing)}")
@@ -50,39 +52,25 @@ def process_data(df_input):
     # Garante que a coluna Quant. Pedidos Enviados é numérica
     df[COL_FILTER] = pd.to_numeric(df[COL_FILTER], errors='coerce').fillna(-1) 
     
-    # A. Corrigindo o erro: Identifica clientes que têm PELO MENOS UM status diferente de 'Pedido Salvo'.
-    # Passamos a Series Booleana como a coluna a ser agregada, e o .any() verifica se algum é True.
+    # A. Identifica clientes que têm PELO MENOS UM status diferente de 'Pedido Salvo'.
     tem_outro_status_series = df[COL_STATUS] != 'Pedido Salvo'
-    
-    # Esta é a LINHA CORRIGIDA que resolve o KeyError:
     clientes_com_outro_status = df.groupby(COL_ID)[COL_ID].transform(lambda x: tem_outro_status_series.loc[x.index].any())
-    # Fim da Linha Corrigida
     
     # B. Filtra pela lógica
     df_qualified = df[
-        # A linha atual deve ser 'Pedido Salvo'
         (df[COL_STATUS] == 'Pedido Salvo') & 
-        
-        # O cliente (Codigo Cliente) NÃO pode ter tido NENHUM outro status (exclusividade)
         (~clientes_com_outro_status) & 
-        
-        # A contagem de pedidos enviados deve ser 0 (garantindo que é um cliente novo/tentativa)
-        (df[COL_FILTER] == 0) 
+        (df[COL_FILTER] == 0) # APENAS clientes que nunca enviaram pedido
     ]
         
     metrics['removed_filter'] = len(df_input) - len(df_qualified)
     
-    # --- CORREÇÕES DE ERRO DE ALINHAMENTO E VAZIO ---
-    
-    # A. Redefine o índice para evitar desalinhamento após filtragem (solução do ValueError)
+    # C. Redefine o índice para evitar desalinhamento
     df = df_qualified.reset_index(drop=True)
     
-    # B. CHECAGEM DE SEGURANÇA: Retorna imediatamente se não houver leads (solução do Length mismatch)
+    # D. CHECAGEM DE SEGURANÇA: Retorna imediatamente se não houver leads
     if df.empty:
         return df, metrics 
-    
-    # C. Eliminar Duplicatas (mantém uma linha por Codigo Cliente)
-    # df_unique já foi filtrado e resetado acima.
     
     # --------------------------------------------------
 
@@ -93,8 +81,11 @@ def process_data(df_input):
         if not full_name:
             first_name = "Cliente"
         else:
-            first_name = str(full_name).strip().split(' ')[0] 
-            first_name = full_name.capitalize() 
+            full_name_str = str(full_name).strip()
+            
+            # Pega APENAS o primeiro nome e capitaliza.
+            first_name = full_name_str.split(' ')[0] 
+            first_name = first_name.capitalize() 
             
         # --- TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
@@ -108,7 +99,7 @@ def process_data(df_input):
         
         return first_name, message
 
-    # --- CORREÇÃO DE ERRO DE ATRIBUIÇÃO (KEYERROR) ---
+    # --- ATRIBUIÇÃO DE COLUNAS DE SAÍDA (Com correção de alinhamento) ---
     
     # Garante que a coluna de nome é string
     df[COL_NAME] = df[COL_NAME].astype(str).fillna('')
@@ -122,7 +113,19 @@ def process_data(df_input):
     # Atribui as colunas (0 e 1) individualmente
     df[COL_OUT_NAME] = temp_df[0]
     df[COL_OUT_MSG] = temp_df[1]
-    # ---------------------------------------------------
+    
+    # 5. Formatar valor total para exibição no dashboard e exportação
+    def format_brl(value):
+        try:
+            # Tenta limpar formatações de R$ e vírgulas para garantir que a conversão para float funcione
+            val_str = str(value).replace('R$', '').replace('.', '').replace(',', '.').strip()
+            val_float = float(val_str)
+            # Formata de volta para BRL com vírgula como separador decimal (para exibição)
+            return f"R$ {val_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        except:
+            return str(value)
+
+    df['Valor_BRL'] = df[COL_TOTAL_VALUE].apply(format_brl)
     
     return df, metrics
 
@@ -130,7 +133,8 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}")
+# Colunas esperadas exibidas na interface
+st.markdown(f"#### Colunas Esperadas: **{COL_ID}**, **{COL_NAME}**, **{COL_PHONE}**, **{COL_STATUS}**, **{COL_FILTER}**, **{COL_ORDER_ID}**, **{COL_TOTAL_VALUE}**")
 
 uploaded_file = st.file_uploader(
     "Arraste ou clique para enviar o arquivo.", 
@@ -143,7 +147,6 @@ if uploaded_file is not None:
         if uploaded_file.name.endswith('.csv'):
             df_original = pd.read_csv(uploaded_file)
         else:
-            # Tenta ler o excel com a dependência openpyxl
             df_original = pd.read_excel(uploaded_file, engine='openpyxl')
             
         st.success(f"Arquivo '{uploaded_file.name}' carregado com sucesso!")
@@ -178,21 +181,23 @@ if uploaded_file is not None:
         st.subheader(f"Leads Prioritários para Vendas ({total_ready} Clientes)")
         
         if total_ready == 0:
-            st.info("Nenhum lead encontrado com o perfil: Apenas 'Pedido Salvo' E 'Quant. Pedidos Enviados' == 0.")
+            st.info("Nenhum lead encontrado com o perfil: Pedido Salvo E Cliente Novo.")
         else:
             st.markdown("---")
             st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
             
-            # Cria o layout da tabela de botões
-            col_headers = st.columns([1.5, 1.5, 7]) 
+            # --- Layout da Tabela com as NOVAS COLUNAS ---
+            col_headers = st.columns([1.5, 1, 1.5, 1.5, 5]) 
             col_headers[0].markdown("**Nome**")
             col_headers[1].markdown(f"**{COL_FILTER}**") 
-            col_headers[2].markdown("**Ação (Disparo de Vendas)**")
+            col_headers[2].markdown(f"**{COL_ORDER_ID}**") 
+            col_headers[3].markdown(f"**{COL_TOTAL_VALUE}**") 
+            col_headers[4].markdown("**Ação (Disparo de Vendas)**")
             st.markdown("---")
             
             # Itera sobre os leads qualificados
             for index, row in df_processed.iterrows():
-                cols = st.columns([1.5, 1.5, 7]) 
+                cols = st.columns([1.5, 1, 1.5, 1.5, 5])
                 
                 first_name = row[COL_OUT_NAME]
                 
@@ -202,6 +207,8 @@ if uploaded_file is not None:
 
                 message_text = row[COL_OUT_MSG]
                 filter_value = row[COL_FILTER]
+                order_id = row[COL_ORDER_ID] 
+                valor_brl = row['Valor_BRL'] # Campo formatado
                 
                 # Cria o link oficial do WhatsApp, codificando a mensagem
                 encoded_message = quote(message_text)
@@ -210,6 +217,8 @@ if uploaded_file is not None:
                 # 1. Exibe os dados
                 cols[0].write(first_name)
                 cols[1].write(f"{filter_value:.0f}")
+                cols[2].write(order_id)
+                cols[3].write(valor_brl) 
                 
                 # 2. Cria e exibe o botão
                 button_label = f"WhatsApp para {first_name}"
@@ -229,12 +238,15 @@ if uploaded_file is not None:
                 {button_label} 💬
                 </a>
                 """
-                cols[2].markdown(button_html, unsafe_allow_html=True)
+                cols[4].markdown(button_html, unsafe_allow_html=True)
 
             st.markdown("---")
 
             # Botão de Download
-            csv_data = df_processed.to_csv(index=False).encode('utf-8')
+            # Garante que as colunas corretas sejam exportadas
+            df_export = df_processed.drop(columns=[COL_TOTAL_VALUE]).rename(columns={'Valor_BRL': COL_TOTAL_VALUE}) 
+
+            csv_data = df_export.to_csv(index=False, sep=';', encoding='utf-8').encode('utf-8')
             st.download_button(
                 label="📥 Baixar Lista de Leads Qualificados (CSV)",
                 data=csv_data,
