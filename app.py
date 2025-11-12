@@ -88,11 +88,10 @@ def process_data(df_input):
             
         # --- NOVO TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
-            f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* \n\n"
+            f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* \n"
             f"Tenho uma ótima notícia para você. \n"
             f"Vimos que você iniciou seu cadastro, mas não conseguiu finalizar sua compra.\n\n"
             f"Para eu te ajudar, poderia me contar o motivo? \n"
-            f"Muitas vezes é o valor do frete e falta de informações do detento.\n\n"
             f"*Me avise pois consegui um BRINDE ESPECIAL* para incluir no seu pedido!"
         )
         # ----------------------------------
@@ -130,7 +129,7 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, **N. Pedido**, {COL_TOTAL_VALUE}")
+st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, N. Pedido, {COL_TOTAL_VALUE}")
 
 uploaded_file = st.file_uploader(
     "Arraste ou clique para enviar o arquivo.", 
