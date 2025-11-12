@@ -82,12 +82,13 @@ def process_data(df_input):
         if not full_name:
             first_name = "Cliente"
         else:
-            # Garante que o nome é uma string e remove acentos antes de processar
+            # 1. Remove acentos e converte para string
             full_name_str = unidecode.unidecode(str(full_name)).strip() 
+            # 2. Pega APENAS o primeiro nome e capitaliza.
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- TEMPLATE DA MENSAGEM DE VENDAS (Emojis corrigidos) ---
+        # --- TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
             f"Olá {first_name}! Aqui é o Victor da *Jumbo CDP!* 👋\n\n"
             f"Tenho uma ótima notícia para você. 🎁\n"
@@ -111,7 +112,7 @@ def process_data(df_input):
     # Cria o DataFrame temporário (colunas nomeadas 0 e 1)
     temp_df = pd.DataFrame(data_series.tolist()) 
     
-    # Atribui as colunas (0 e 1) individualmente
+    # Atribui as colunas (0 e 1) individualmente (solução final para o erro de atribuição)
     df[COL_OUT_NAME] = temp_df[0]
     df[COL_OUT_MSG] = temp_df[1]
     
@@ -161,10 +162,6 @@ if uploaded_file is not None:
     if st.button("🚀 Processar Dados e Gerar Leads Prioritários"):
         
         try:
-            # Instala a dependência unidecode (necessária para a correção de acentos no nome)
-            import subprocess
-            subprocess.run(["pip", "install", "unidecode"])
-            
             df_processed, metrics = process_data(df_original)
         except ValueError as ve:
             st.error(f"Erro de Processamento: {ve}")
