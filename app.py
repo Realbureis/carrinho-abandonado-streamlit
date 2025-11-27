@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from urllib.parse import quote
 import io
-import json # <--- NOVO: Necessário para criar strings seguras para JavaScript
 
 # --- Configurações da Aplicação ---
 st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
@@ -183,13 +182,13 @@ if uploaded_file is not None:
             st.markdown("---")
             st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
             
-            # --- LAYOUT FINAL (Colunas para os dados) ---
+            # Layout da tabela
             col_headers = st.columns([1.5, 1, 1.5, 1.5, 5]) 
             col_headers[0].markdown("**Nome**")
             col_headers[1].markdown(f"**{COL_FILTER}**") 
             col_headers[2].markdown(f"**{COL_ORDER_ID}**") 
             col_headers[3].markdown(f"**{COL_TOTAL_VALUE}**") 
-            col_headers[4].markdown("**Ação (Disparo/Cópia)**") 
+            col_headers[4].markdown("**Ação (Disparo/Cópia)**")
             st.markdown("---")
             
             # Itera sobre os leads qualificados
@@ -206,18 +205,15 @@ if uploaded_file is not None:
                 order_id = row[COL_ORDER_ID] 
                 valor_brl = row['Valor_BRL'] 
                 
-                # --- CORREÇÃO CRÍTICA DO BOTÃO DE CÓPIA ---
-                # 1. Use json.dumps para criar a string segura para JavaScript
-                js_safe_message = json.dumps(message_text)
-
-                # LINK WHATSAPP APP (Protocolo de App)
+                # LINK WHATSAPP APP (protocolo nativo para melhor chance de abrir no App do Windows)
                 encoded_message = quote(message_text)
                 whatsapp_link = f"whatsapp://send?phone=55{phone_number}&text={encoded_message}"
                 
                 # CÓDIGO DO BOTÃO DE CÓPIA (JavaScript embutido)
+                # O botão de cópia é inserido via Markdown/HTML
                 copy_button_html = f"""
-                <button onclick="navigator.clipboard.writeText({js_safe_message})" 
-                        style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 14px; display: inline-block;">
+                <button onclick="navigator.clipboard.writeText('{message_text.replace("'", "\\'")}')" 
+                        style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 14px;">
                     📋 Copiar Mensagem
                 </button>
                 """
@@ -234,7 +230,6 @@ if uploaded_file is not None:
                     text-decoration: none;
                     cursor: pointer;
                     margin-left: 10px;
-                    font-size: 14px;
                 ">
                 ▶️ WhatsApp
                 </a>
