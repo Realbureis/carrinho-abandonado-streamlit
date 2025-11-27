@@ -86,13 +86,13 @@ def process_data(df_input):
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- TEMPLATE DA MENSAGEM DE VENDAS ---
+        # --- NOVO TEMPLATE DA MENSAGEM DE VENDAS (Espaçamento Corrigido) ---
         message = (
             f"Olá {first_name}! Aqui é a Sofia, sua consultora exclusiva da Jumbo CDP!\n"
-            f"Tenho uma ótima notícia para você.\n\n"
+            f"Tenho uma ótima notícia para você.\n\n" # <--- Espaçamento aqui
             f"Vi que você iniciou seu cadastro, mas não conseguiu finalizar a compra.\n"
-            f"Para eu te ajudar, poderia me contar o motivo?\n\n"
-            f"Consegui separar *UM BRINDE ESPECIAL* para incluir no seu pedido, e quero garantir que você receba tudo certinho.\n\n"
+            f"Para eu te ajudar, poderia me contar o motivo?\n\n" # <--- Espaçamento aqui
+            f"Consegui separar *UM BRINDE ESPECIAL* para incluir no seu pedido, e quero garantir que você receba tudo certinho.\n\n" # <--- Espaçamento aqui
             f"Conte comigo para cuidar de você!"
         )
         # ----------------------------------
@@ -182,13 +182,13 @@ if uploaded_file is not None:
             st.markdown("---")
             st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
             
-            # Layout da tabela
+            # Cria o layout da tabela de botões
             col_headers = st.columns([1.5, 1, 1.5, 1.5, 5]) 
             col_headers[0].markdown("**Nome**")
             col_headers[1].markdown(f"**{COL_FILTER}**") 
             col_headers[2].markdown(f"**{COL_ORDER_ID}**") 
             col_headers[3].markdown(f"**{COL_TOTAL_VALUE}**") 
-            col_headers[4].markdown("**Ação (Disparo/Cópia)**")
+            col_headers[4].markdown("**Ação (Disparo de Vendas)**")
             st.markdown("---")
             
             # Itera sobre os leads qualificados
@@ -196,44 +196,19 @@ if uploaded_file is not None:
                 cols = st.columns([1.5, 1, 1.5, 1.5, 5]) 
                 
                 first_name = row[COL_OUT_NAME]
-                message_text = row[COL_OUT_MSG]
                 
-                # Prepara o link e os dados
+                # Prepara o número de telefone (remove tudo exceto dígitos)
                 phone_raw = str(row[COL_PHONE])
                 phone_number = "".join(filter(str.isdigit, phone_raw))
+
+                message_text = row[COL_OUT_MSG]
                 filter_value = row[COL_FILTER]
                 order_id = row[COL_ORDER_ID] 
                 valor_brl = row['Valor_BRL'] 
                 
-                # LINK WHATSAPP APP (protocolo nativo para melhor chance de abrir no App do Windows)
+                # Cria o link oficial do WhatsApp, codificando a mensagem
                 encoded_message = quote(message_text)
-                whatsapp_link = f"whatsapp://send?phone=55{phone_number}&text={encoded_message}"
-                
-                # CÓDIGO DO BOTÃO DE CÓPIA (JavaScript embutido)
-                # O botão de cópia é inserido via Markdown/HTML
-                copy_button_html = f"""
-                <button onclick="navigator.clipboard.writeText('{message_text.replace("'", "\\'")}')" 
-                        style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 14px;">
-                    📋 Copiar Mensagem
-                </button>
-                """
-
-                # CÓDIGO DO BOTÃO WHATSAPP
-                whatsapp_button_html = f"""
-                <a href="{whatsapp_link}" target="_blank" style="
-                    display: inline-block; 
-                    padding: 8px 12px; 
-                    background-color: #25D366; 
-                    color: white; 
-                    border-radius: 4px; 
-                    border: 1px solid #128C7E;
-                    text-decoration: none;
-                    cursor: pointer;
-                    margin-left: 10px;
-                ">
-                ▶️ WhatsApp
-                </a>
-                """
+                whatsapp_link = f"https://wa.me/55{phone_number}?text={encoded_message}"
                 
                 # 1. Exibe os dados
                 cols[0].write(first_name)
@@ -241,9 +216,25 @@ if uploaded_file is not None:
                 cols[2].write(order_id)
                 cols[3].write(valor_brl)
                 
-                # 2. Exibe AMBOS os botões na coluna Ação (col[4])
-                cols[4].markdown(copy_button_html + whatsapp_button_html, unsafe_allow_html=True)
-
+                # 2. Cria e exibe o botão
+                button_label = f"WhatsApp para {first_name}"
+                button_html = f"""
+                <a href="{whatsapp_link}" target="_blank" style="
+                    display: inline-block; 
+                    padding: 8px 12px; 
+                    background-color: #25D366; 
+                    color: white; 
+                    text-align: center; 
+                    text-decoration: none; 
+                    border-radius: 4px; 
+                    border: 1px solid #128C7E;
+                    cursor: pointer;
+                    white-space: nowrap;
+                ">
+                {button_label}
+                </a>
+                """
+                cols[4].markdown(button_html, unsafe_allow_html=True)
 
             st.markdown("---")
 
@@ -259,3 +250,5 @@ if uploaded_file is not None:
                 file_name='leads_qualificados_para_vendas.csv',
                 mime='text/csv',
             )
+
+
