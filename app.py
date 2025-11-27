@@ -149,7 +149,7 @@ if uploaded_file is not None:
         
     except Exception as e:
         if 'openpyxl' in str(e):
-             st.error("Erro ao ler o arquivo Excel (.xlsx). Certifique-se de que a biblioteca 'openpyxl' está instalada no ambiente de execução do seu seu aplicativo (via requirements.txt).")
+             st.error("Erro ao ler o arquivo Excel (.xlsx). Certifique-se de que a biblioteca 'openpyxl' está instalada no ambiente de execução do seu aplicativo (via requirements.txt).")
         else:
             st.error(f"Erro ao ler o arquivo. Erro: {e}")
         st.stop()
@@ -182,13 +182,13 @@ if uploaded_file is not None:
             st.markdown("---")
             st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
             
-            # --- LAYOUT FINAL (Sem Coluna de Mensagem Exibida) ---
+            # --- LAYOUT FINAL (Colunas para os dados) ---
             col_headers = st.columns([1.5, 1, 1.5, 1.5, 5]) 
             col_headers[0].markdown("**Nome**")
             col_headers[1].markdown(f"**{COL_FILTER}**") 
             col_headers[2].markdown(f"**{COL_ORDER_ID}**") 
             col_headers[3].markdown(f"**{COL_TOTAL_VALUE}**") 
-            col_headers[4].markdown("**Ação (Disparo/Cópia)**") # Coluna expandida para 2 botões
+            col_headers[4].markdown("**Ação (Disparo/Cópia)**") 
             st.markdown("---")
             
             # Itera sobre os leads qualificados
@@ -205,25 +205,25 @@ if uploaded_file is not None:
                 order_id = row[COL_ORDER_ID] 
                 valor_brl = row['Valor_BRL'] 
                 
-                # --- CORREÇÃO CRÍTICA: LIMPAR MENSAGEM PARA JS E ESCAPAR AS ASPAS ---
-                # Remove quebras de linha para evitar quebra do JavaScript
-                clean_message = message_text.replace('\n', ' ').replace('\r', '')
-                # Escapa as aspas simples dentro da mensagem
-                js_safe_message = clean_message.replace("'", "\\'")
-                
+                # --- CORREÇÃO CRÍTICA DO BOTÃO DE CÓPIA ---
+                # 1. Remove quebras de linha e prepara para JS
+                clean_message = message_text.replace('\n', ' ').replace('\r', ' ')
+                # 2. Escapa aspas para segurança do JS
+                js_safe_message = clean_message.replace("'", "\\'").replace('"', '\\"')
+
                 # LINK WHATSAPP APP (Protocolo de App)
                 encoded_message = quote(message_text)
                 whatsapp_link = f"whatsapp://send?phone=55{phone_number}&text={encoded_message}"
                 
-                # CÓDIGO DO BOTÃO DE CÓPIA (JavaScript embutido)
+                # CÓDIGO DO BOTÃO DE CÓPIA (JavaScript embutido) - Display inline-block adicionado
                 copy_button_html = f"""
                 <button onclick="navigator.clipboard.writeText('{js_safe_message}')" 
-                        style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 14px;">
+                        style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 14px; display: inline-block;">
                     📋 Copiar Mensagem
                 </button>
                 """
 
-                # CÓDIGO DO BOTÃO WHATSAPP
+                # CÓDIGO DO BOTÃO WHATSAPP - Display inline-block já estava presente
                 whatsapp_button_html = f"""
                 <a href="{whatsapp_link}" target="_blank" style="
                     display: inline-block; 
@@ -247,7 +247,7 @@ if uploaded_file is not None:
                 cols[2].write(order_id)
                 cols[3].write(valor_brl)
                 
-                # 2. Exibe AMBOS os botões na coluna Ação (col[4])
+                # 2. Exibe AMBOS os botões na coluna Ação (col[4]) - Eles devem ficar lado a lado
                 cols[4].markdown(copy_button_html + whatsapp_button_html, unsafe_allow_html=True)
 
 
