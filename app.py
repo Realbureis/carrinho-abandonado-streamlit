@@ -86,13 +86,13 @@ def process_data(df_input):
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- NOVO TEMPLATE DA MENSAGEM DE VENDAS (Espaçamento Corrigido) ---
+        # --- TEMPLATE DA MENSAGEM DE VENDAS (Espaçamento Corrigido) ---
         message = (
             f"Olá {first_name}! Aqui é a Sofia, sua consultora exclusiva da Jumbo CDP!\n"
-            f"Tenho uma ótima notícia para você.\n\n" # <--- Espaçamento aqui
+            f"Tenho uma ótima notícia para você.\n\n" 
             f"Vi que você iniciou seu cadastro, mas não conseguiu finalizar a compra.\n"
-            f"Para eu te ajudar, poderia me contar o motivo?\n\n" # <--- Espaçamento aqui
-            f"Consegui separar *UM BRINDE ESPECIAL* para incluir no seu pedido, e quero garantir que você receba tudo certinho.\n\n" # <--- Espaçamento aqui
+            f"Para eu te ajudar, poderia me contar o motivo?\n\n" 
+            f"Consegui separar *UM BRINDE ESPECIAL* para incluir no seu pedido, e quero garantir que você receba tudo certinho.\n\n" 
             f"Conte comigo para cuidar de você!"
         )
         # ----------------------------------
@@ -206,17 +206,18 @@ if uploaded_file is not None:
                 order_id = row[COL_ORDER_ID] 
                 valor_brl = row['Valor_BRL'] 
                 
-                # Cria o link oficial do WhatsApp, codificando a mensagem
+                # 1. Cria o link OFICIAL DO APLICATIVO
                 encoded_message = quote(message_text)
-                whatsapp_link = f"https://wa.me/55{phone_number}?text={encoded_message}"
+                # ALTERADO: Usa o protocolo nativo do Windows/App Desktop
+                whatsapp_link = f"whatsapp://send?phone=55{phone_number}&text={encoded_message}"
                 
-                # 1. Exibe os dados
+                # 2. Exibe os dados
                 cols[0].write(first_name)
                 cols[1].write(f"{filter_value:.0f}")
                 cols[2].write(order_id)
                 cols[3].write(valor_brl)
                 
-                # 2. Cria e exibe o botão
+                # 3. Cria e exibe o botão
                 button_label = f"WhatsApp para {first_name}"
                 button_html = f"""
                 <a href="{whatsapp_link}" target="_blank" style="
