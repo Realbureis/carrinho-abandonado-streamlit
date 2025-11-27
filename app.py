@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from urllib.parse import quote
 import io
+import json # <--- NOVO: Necessário para criar strings seguras para JavaScript
 
 # --- Configurações da Aplicação ---
 st.set_page_config(layout="wide", page_title="Processador de Clientes de Vendas Prioritárias")
@@ -206,24 +207,22 @@ if uploaded_file is not None:
                 valor_brl = row['Valor_BRL'] 
                 
                 # --- CORREÇÃO CRÍTICA DO BOTÃO DE CÓPIA ---
-                # 1. Remove quebras de linha e prepara para JS
-                clean_message = message_text.replace('\n', ' ').replace('\r', ' ')
-                # 2. Escapa aspas para segurança do JS
-                js_safe_message = clean_message.replace("'", "\\'").replace('"', '\\"')
+                # 1. Use json.dumps para criar a string segura para JavaScript
+                js_safe_message = json.dumps(message_text)
 
                 # LINK WHATSAPP APP (Protocolo de App)
                 encoded_message = quote(message_text)
                 whatsapp_link = f"whatsapp://send?phone=55{phone_number}&text={encoded_message}"
                 
-                # CÓDIGO DO BOTÃO DE CÓPIA (JavaScript embutido) - Display inline-block adicionado
+                # CÓDIGO DO BOTÃO DE CÓPIA (JavaScript embutido)
                 copy_button_html = f"""
-                <button onclick="navigator.clipboard.writeText('{js_safe_message}')" 
+                <button onclick="navigator.clipboard.writeText({js_safe_message})" 
                         style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 14px; display: inline-block;">
                     📋 Copiar Mensagem
                 </button>
                 """
 
-                # CÓDIGO DO BOTÃO WHATSAPP - Display inline-block já estava presente
+                # CÓDIGO DO BOTÃO WHATSAPP
                 whatsapp_button_html = f"""
                 <a href="{whatsapp_link}" target="_blank" style="
                     display: inline-block; 
@@ -247,7 +246,7 @@ if uploaded_file is not None:
                 cols[2].write(order_id)
                 cols[3].write(valor_brl)
                 
-                # 2. Exibe AMBOS os botões na coluna Ação (col[4]) - Eles devem ficar lado a lado
+                # 2. Exibe AMBOS os botões na coluna Ação (col[4])
                 cols[4].markdown(copy_button_html + whatsapp_button_html, unsafe_allow_html=True)
 
 
