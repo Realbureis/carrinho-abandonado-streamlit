@@ -86,16 +86,15 @@ def process_data(df_input):
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- TEMPLATE DA MENSAGEM DE VENDAS (Espaçamento Corrigido) ---
+        # --- TEMPLATE DA MENSAGEM (ULTRA-SIMPLIFICADO PARA WINDOWS APP) ---
         message = (
-            f"Olá {first_name}! Aqui é a Sofia, sua consultora exclusiva da Jumbo CDP!\n"
-            f"Tenho uma ótima notícia para você.\n\n" 
-            f"Vi que você iniciou seu cadastro, mas não conseguiu finalizar a compra.\n"
-            f"Para eu te ajudar, poderia me contar o motivo?\n\n" 
-            f"Consegui separar *UM BRINDE ESPECIAL* para incluir no seu pedido, e quero garantir que você receba tudo certinho.\n\n" 
+            f"Olá {first_name}! Aqui é a Sofia, sua consultora exclusiva da Jumbo CDP! "
+            f"Tenho uma ótima notícia para você. Percebemos que você iniciou seu cadastro, mas não conseguiu finalizar a compra. "
+            f"Para eu te ajudar, poderia me contar o motivo? "
+            f"Consegui separar *UM BRINDE ESPECIAL* para incluir no seu pedido, e quero garantir que você receba tudo certinho. "
             f"Conte comigo para cuidar de você!"
         )
-        # ----------------------------------
+        # -------------------------------------------------------------------
         
         return first_name, message
 
@@ -130,7 +129,7 @@ def process_data(df_input):
 
 # Seção de Upload
 st.header("1. Upload do Relatório de Vendas (Excel/CSV)")
-st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_FILTER}, N. Pedido, {COL_TOTAL_VALUE}")
+st.markdown(f"#### Colunas Esperadas: {COL_ID}, {COL_NAME}, {COL_PHONE}, {COL_STATUS}, {COL_ORDER_ID}, {COL_TOTAL_VALUE}")
 
 uploaded_file = st.file_uploader(
     "Arraste ou clique para enviar o arquivo.", 
@@ -208,7 +207,7 @@ if uploaded_file is not None:
                 
                 # 1. Cria o link OFICIAL DO APLICATIVO
                 encoded_message = quote(message_text)
-                # ALTERADO: Usa o protocolo nativo do Windows/App Desktop
+                # Usa o protocolo nativo do Windows/App Desktop
                 whatsapp_link = f"whatsapp://send?phone=55{phone_number}&text={encoded_message}"
                 
                 # 2. Exibe os dados
