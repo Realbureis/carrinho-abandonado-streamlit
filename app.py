@@ -86,13 +86,13 @@ def process_data(df_input):
             first_name = full_name_str.split(' ')[0] 
             first_name = first_name.capitalize() 
             
-        # --- TEMPLATE DA MENSAGEM DE VENDAS (Espaçamento Corrigido) ---
+        # --- TEMPLATE DA MENSAGEM DE VENDAS ---
         message = (
             f"Olá {first_name}! Aqui é a Sofia, sua consultora exclusiva da Jumbo CDP!\n"
-            f"Tenho uma ótima notícia para você.\n\n" 
+            f"Tenho uma ótima notícia para você.\n\n"
             f"Vi que você iniciou seu cadastro, mas não conseguiu finalizar a compra.\n"
-            f"Para eu te ajudar, poderia me contar o motivo?\n\n" 
-            f"Consegui separar *UM BRINDE ESPECIAL* para incluir no seu pedido, e quero garantir que você receba tudo certinho.\n\n" 
+            f"Para eu te ajudar, poderia me contar o motivo?\n\n"
+            f"Consegui separar *UM BRINDE ESPECIAL* para incluir no seu pedido, e quero garantir que você receba tudo certinho.\n\n"
             f"Conte comigo para cuidar de você!"
         )
         # ----------------------------------
@@ -180,75 +180,70 @@ if uploaded_file is not None:
             st.info("Nenhum lead encontrado com o perfil: Pedido Salvo E Cliente Novo.")
         else:
             st.markdown("---")
-            st.markdown("#### **PASSO 1:** Clique em **Copiar Mensagem**. **PASSO 2:** Clique em **WhatsApp** e cole o texto no chat.")
+            st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
             
-            # Cria o layout da tabela de botões. A coluna de AÇÃO foi dividida.
-            col_headers = st.columns([1.5, 1, 1.5, 1.5, 2.5, 2.5]) 
+            # Ajuste o peso das colunas para REMOVER O ESPAÇO DA MENSAGEM EXIBIDA
+            col_headers = st.columns([1.5, 1, 1.5, 1.5, 5]) 
             col_headers[0].markdown("**Nome**")
             col_headers[1].markdown(f"**{COL_FILTER}**") 
             col_headers[2].markdown(f"**{COL_ORDER_ID}**") 
             col_headers[3].markdown(f"**{COL_TOTAL_VALUE}**") 
-            col_headers[4].markdown("**Copiar Msg.**") # Nova coluna para o botão copiar
-            col_headers[5].markdown("**Enviar WhatsApp**") # Coluna para o botão de envio
+            col_headers[4].markdown("**Ação (Disparo/Cópia)**")
             st.markdown("---")
             
             # Itera sobre os leads qualificados
             for index, row in df_processed.iterrows():
-                # Define 6 colunas para cada linha (dados + 2 botões)
-                cols = st.columns([1.5, 1, 1.5, 1.5, 2.5, 2.5]) 
+                # Ajuste o peso das colunas para REMOVER O ESPAÇO DA MENSAGEM EXIBIDA
+                cols = st.columns([1.5, 1, 1.5, 1.5, 5]) 
                 
                 first_name = row[COL_OUT_NAME]
+                message_text = row[COL_OUT_MSG]
                 
-                # Prepara o número de telefone (remove tudo exceto dígitos)
+                # Prepara o link e os dados
                 phone_raw = str(row[COL_PHONE])
                 phone_number = "".join(filter(str.isdigit, phone_raw))
-
-                message_text = row[COL_OUT_MSG]
                 filter_value = row[COL_FILTER]
                 order_id = row[COL_ORDER_ID] 
                 valor_brl = row['Valor_BRL'] 
                 
-                # 1. Cria o link OFICIAL DO APLICATIVO (sem o texto)
-                # O texto é omitido para evitar o erro de truncamento do Windows.
-                whatsapp_link = f"whatsapp://send?phone=55{phone_number}"
+                # LINK WHATSAPP APP
+                encoded_message = quote(message_text)
+                whatsapp_link = f"whatsapp://send?phone=55{phone_number}&text={encoded_message}"
                 
-                # 2. Exibe os dados
-                cols[0].write(first_name)
-                cols[1].write(f"{filter_value:.0f}")
-                cols[2].write(order_id)
-                cols[3].write(valor_brl)
-                
-                # --- BOTÃO COPIAR (Nova Funcionalidade com JS) ---
-                
-                # Prepara a mensagem para JS, escapando aspas.
-                safe_message = message_text.replace("'", "\\'")
-                copy_js = f"""
-                <button onclick="navigator.clipboard.writeText('{safe_message}')" 
+                # CÓDIGO DO BOTÃO DE CÓPIA (JavaScript embutido)
+                copy_button_html = f"""
+                <button onclick="navigator.clipboard.writeText('{message_text.replace("'", "\\'")}')" 
                         style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap;">
                     📋 Copiar Mensagem
                 </button>
                 """
-                cols[4].markdown(copy_js, unsafe_allow_html=True)
-                
-                # --- BOTÃO WHATSAPP (Abre o App) ---
-                button_label = f"📱 WhatsApp"
-                button_html = f"""
+
+                # CÓDIGO DO BOTÃO WHATSAPP
+                whatsapp_button_html = f"""
                 <a href="{whatsapp_link}" target="_blank" style="
                     display: inline-block; 
                     padding: 8px 12px; 
                     background-color: #25D366; 
                     color: white; 
-                    text-align: center; 
-                    text-decoration: none; 
                     border-radius: 4px; 
                     border: 1px solid #128C7E;
+                    text-decoration: none;
                     cursor: pointer;
-                    white-space: nowrap;
+                    margin-left: 10px;
                 ">
-                {button_label}
+                ▶️ WhatsApp
                 </a>
                 """
-                cols[5].markdown(button_html, unsafe_allow_html=True)
+                
+                # 1. Exibe os dados
+                cols[0].write(first_name)
+                cols[1].write(f"{filter_value:.0f}")
+                cols[2].write(order_id)
+                cols[3].write(valor_brl)
+                
+                # 2. Exibe AMBOS os botões na coluna Ação (col[4])
+                cols[4].markdown(copy_button_html + whatsapp_button_html, unsafe_allow_html=True)
+
 
             st.markdown("---")
 
