@@ -149,7 +149,7 @@ if uploaded_file is not None:
         
     except Exception as e:
         if 'openpyxl' in str(e):
-             st.error("Erro ao ler o arquivo Excel (.xlsx). Certifique-se de que a biblioteca 'openpyxl' está instalada no ambiente de execução do seu aplicativo (via requirements.txt).")
+             st.error("Erro ao ler o arquivo Excel (.xlsx). Certifique-se de que a biblioteca 'openpyxl' está instalada no ambiente de execução do seu seu aplicativo (via requirements.txt).")
         else:
             st.error(f"Erro ao ler o arquivo. Erro: {e}")
         st.stop()
@@ -182,18 +182,17 @@ if uploaded_file is not None:
             st.markdown("---")
             st.markdown("#### Clique no botão para iniciar o contato de vendas no WhatsApp.")
             
-            # Ajuste o peso das colunas para REMOVER O ESPAÇO DA MENSAGEM EXIBIDA
+            # --- LAYOUT FINAL (Sem Coluna de Mensagem Exibida) ---
             col_headers = st.columns([1.5, 1, 1.5, 1.5, 5]) 
             col_headers[0].markdown("**Nome**")
             col_headers[1].markdown(f"**{COL_FILTER}**") 
             col_headers[2].markdown(f"**{COL_ORDER_ID}**") 
             col_headers[3].markdown(f"**{COL_TOTAL_VALUE}**") 
-            col_headers[4].markdown("**Ação (Disparo/Cópia)**")
+            col_headers[4].markdown("**Ação (Disparo/Cópia)**") # Coluna expandida para 2 botões
             st.markdown("---")
             
             # Itera sobre os leads qualificados
             for index, row in df_processed.iterrows():
-                # Ajuste o peso das colunas para REMOVER O ESPAÇO DA MENSAGEM EXIBIDA
                 cols = st.columns([1.5, 1, 1.5, 1.5, 5]) 
                 
                 first_name = row[COL_OUT_NAME]
@@ -206,14 +205,20 @@ if uploaded_file is not None:
                 order_id = row[COL_ORDER_ID] 
                 valor_brl = row['Valor_BRL'] 
                 
-                # LINK WHATSAPP APP
+                # --- CORREÇÃO CRÍTICA: LIMPAR MENSAGEM PARA JS E ESCAPAR AS ASPAS ---
+                # Remove quebras de linha para evitar quebra do JavaScript
+                clean_message = message_text.replace('\n', ' ').replace('\r', '')
+                # Escapa as aspas simples dentro da mensagem
+                js_safe_message = clean_message.replace("'", "\\'")
+                
+                # LINK WHATSAPP APP (Protocolo de App)
                 encoded_message = quote(message_text)
                 whatsapp_link = f"whatsapp://send?phone=55{phone_number}&text={encoded_message}"
                 
                 # CÓDIGO DO BOTÃO DE CÓPIA (JavaScript embutido)
                 copy_button_html = f"""
-                <button onclick="navigator.clipboard.writeText('{message_text.replace("'", "\\'")}')" 
-                        style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap;">
+                <button onclick="navigator.clipboard.writeText('{js_safe_message}')" 
+                        style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 14px;">
                     📋 Copiar Mensagem
                 </button>
                 """
@@ -230,6 +235,7 @@ if uploaded_file is not None:
                     text-decoration: none;
                     cursor: pointer;
                     margin-left: 10px;
+                    font-size: 14px;
                 ">
                 ▶️ WhatsApp
                 </a>
